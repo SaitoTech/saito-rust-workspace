@@ -41,7 +41,7 @@ pub mod test {
     use tokio::sync::RwLock;
 
     use crate::core::consensus::block::{Block, BlockType};
-    use crate::core::consensus::blockchain::{AddBlockResult, Blockchain, DEFAULT_SOCIAL_STAKE};
+    use crate::core::consensus::blockchain::{AddBlockResult, Blockchain};
     use crate::core::consensus::golden_ticket::GoldenTicket;
     use crate::core::consensus::mempool::Mempool;
     use crate::core::consensus::peers::peer_collection::PeerCollection;
@@ -50,7 +50,7 @@ pub mod test {
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
         Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-        Timestamp, UtxoSet, PROJECT_PUBLIC_KEY,
+        Timestamp, UtxoSet, NOLAN_PER_SAITO, PROJECT_PUBLIC_KEY,
     };
     use crate::core::io::network::Network;
     use crate::core::io::storage::Storage;
@@ -98,7 +98,12 @@ pub mod test {
             let wallet = Wallet::new(keys.1, keys.0);
             let peers = Arc::new(RwLock::new(PeerCollection::default()));
             let wallet_lock = Arc::new(RwLock::new(wallet));
-            let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone(), 100)));
+            let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(
+                wallet_lock.clone(),
+                100,
+                0,
+                60,
+            )));
             let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
             let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
             let configs = Arc::new(RwLock::new(TestConfiguration {
@@ -107,7 +112,10 @@ pub mod test {
                     heartbeat_interval: 100,
                     prune_after_blocks: 8,
                     max_staker_recursions: 3,
+                    default_social_stake: 0,
+                    default_social_stake_period: 60,
                 },
+                blockchain: BlockchainConfig::default(),
             }));
 
             let issuance_path = TestManager::get_test_issuance_file().unwrap();
@@ -177,7 +185,7 @@ pub mod test {
         pub async fn enable_staking(&mut self, mut stake_value: Currency) {
             let mut blockchain = self.blockchain_lock.write().await;
             if stake_value == 0 {
-                stake_value = DEFAULT_SOCIAL_STAKE;
+                stake_value = 2_000_000 * NOLAN_PER_SAITO;
             }
             blockchain.social_stake_requirement = stake_value;
         }
@@ -629,7 +637,7 @@ pub mod test {
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
 
-            let mut configs = self.config_lock.read().await;
+            let configs = self.config_lock.read().await;
             let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
 
             let (latest_block_id, latest_block_hash) = {
@@ -722,8 +730,9 @@ pub mod test {
                 configs.deref(),
                 &self.storage,
             )
-            .await;
-            block.generate();
+            .await
+            .unwrap();
+            block.generate().unwrap();
             block.sign(&private_key);
 
             block
@@ -839,7 +848,7 @@ pub mod test {
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
-            block.generate();
+            block.generate().unwrap();
             block.sign(&private_key);
 
             assert!(verify_signature(
@@ -887,7 +896,7 @@ pub mod test {
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
-            block.generate();
+            block.generate().unwrap();
             block.sign(&private_key);
 
             assert!(verify_signature(
@@ -939,7 +948,7 @@ pub mod test {
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
-            block.generate();
+            block.generate().unwrap();
             block.sign(&private_key);
 
             assert!(verify_signature(
@@ -1076,7 +1085,7 @@ pub mod test {
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
 
-            block.generate();
+            block.generate().unwrap();
             block.sign(&private_key);
 
             assert!(verify_signature(
@@ -1108,6 +1117,7 @@ pub mod test {
 
     struct TestConfiguration {
         consensus: ConsensusConfig,
+        blockchain: BlockchainConfig,
     }
 
     impl Debug for TestConfiguration {
@@ -1125,8 +1135,8 @@ pub mod test {
             todo!()
         }
 
-        fn get_blockchain_configs(&self) -> Option<BlockchainConfig> {
-            todo!()
+        fn get_blockchain_configs(&self) -> &BlockchainConfig {
+            &self.blockchain
         }
 
         fn get_block_fetch_url(&self) -> String {

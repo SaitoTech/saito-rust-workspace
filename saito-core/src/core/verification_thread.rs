@@ -1,9 +1,10 @@
+use std::any::Any;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, warn};
+use log::{debug, trace, warn};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -42,11 +43,10 @@ pub struct VerificationThread {
 
 impl VerificationThread {
     pub async fn verify_tx(&mut self, mut transaction: Transaction) {
-        let public_key;
-        // trace!("locking blockchain 7");
+        trace!("verifying tx : {:?}", transaction.signature.to_hex());
         let blockchain = self.blockchain_lock.read().await;
         let wallet = self.wallet_lock.read().await;
-        public_key = wallet.public_key;
+        let public_key = wallet.public_key;
         transaction.generate(&public_key, 0, 0);
 
         // TODO : should we skip validation against utxo if we don't have the full utxo ?
@@ -134,7 +134,7 @@ impl VerificationThread {
         let mut block = result.unwrap();
         block.routed_from_peer = Some(peer_index);
 
-        block.generate();
+        block.generate().unwrap();
 
         if block.id != block_id || block.hash != block_hash {
             warn!(
@@ -180,6 +180,10 @@ impl ProcessEvent<VerifyRequest> for VerificationThread {
     }
 
     async fn process_event(&mut self, request: VerifyRequest) -> Option<()> {
+        trace!(
+            "verification thread processing event : {:?}",
+            request.type_id()
+        );
         match request {
             VerifyRequest::Transaction(transaction) => {
                 self.verify_tx(transaction).await;

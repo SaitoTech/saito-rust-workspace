@@ -27,7 +27,7 @@ pub const CHANNEL_SAFE_BUFFER: usize = 16;
 
 pub const NOLAN_PER_SAITO: Currency = 100_000_000;
 
-pub const PROJECT_PUBLIC_KEY: &'static str = "q6TTBeSStCLXEPoS5TUVAxNiGGnRDZQenpvAXXAfTmtA";
+pub const PROJECT_PUBLIC_KEY: &str = "q6TTBeSStCLXEPoS5TUVAxNiGGnRDZQenpvAXXAfTmtA";
 
 // #[cfg(test)]
 // pub const GENESIS_PERIOD: u64 = 100;
@@ -40,7 +40,7 @@ pub const PROJECT_PUBLIC_KEY: &'static str = "q6TTBeSStCLXEPoS5TUVAxNiGGnRDZQenp
 // max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
 // pub const MAX_STAKER_RECURSION: u64 = 3;
 // max token supply - used in validating block #1
-pub const MAX_TOKEN_SUPPLY: Currency = 1_000_000_000_000_000_000;
+pub const MAX_TOKEN_SUPPLY: Currency = 7_000_000_000 * NOLAN_PER_SAITO;
 // minimum golden tickets required ( NUMBER_OF_TICKETS / number of preceding blocks )
 pub const MIN_GOLDEN_TICKETS_NUMERATOR: u64 = 2;
 // minimum golden tickets required ( number of tickets / NUMBER_OF_PRECEDING_BLOCKS )

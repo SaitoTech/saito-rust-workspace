@@ -4,8 +4,8 @@ import fs from "fs/promises";
 import SlrNode from "./slr.node";
 const { exec } = require("child_process");
 
-const TEST_DIR = "temp_test_directory";
-const SLR_DIR = "../../saito-lite-rust";
+export const TEST_DIR = "temp_test_directory";
+export const SLR_DIR = "../../saito-lite-rust";
 
 export const TEST_KEY_PAIRS = [
   {
@@ -65,14 +65,11 @@ export class NodeSet {
       console.assert(config.port < 100);
       console.assert(this.config.basePort > 10000);
       const port = this.config.basePort + config.port;
+      console.log("assigned public key : " + config.publicKey + " for node : " + config.name);
+      const node = await Bootstrapper.bootstrap({ ...config, dir: dir, port: port });
       if (config.isGenesis) {
         await this.writeIssuance(this.config.issuance, dir);
       }
-
-      console.log("assigned public key : " + config.publicKey + " for node : " + config.name);
-
-      const node = await Bootstrapper.bootstrap({ ...config, dir: dir, port: port });
-
       this.nodes.push(node);
     }
   }
@@ -204,7 +201,7 @@ class SlrBootstrapper extends NodeBootstrapper {
     }
     await fs.rm(this.dir, { recursive: true, force: true });
     await SaitoNode.runCommand(
-      `time rsync -a --exclude='nettest' --exclude='.git' --exclude='data' ${this.config.originalCodeLocation}/ ${this.dir}`,
+      `time rsync -a --exclude='nettest' --exclude='.git' --exclude='data' --exclude="node_modules" ${this.config.originalCodeLocation}/ ${this.dir}`,
       currentDir,
     );
     await SaitoNode.runCommand("time npm install", this.dir);

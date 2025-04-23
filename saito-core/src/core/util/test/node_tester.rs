@@ -1,7 +1,7 @@
 #[cfg(test)]
 pub mod test {
     use crate::core::consensus::block::{Block, BlockType};
-    use crate::core::consensus::blockchain::{Blockchain, DEFAULT_SOCIAL_STAKE};
+    use crate::core::consensus::blockchain::Blockchain;
     use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
     use crate::core::consensus::context::Context;
     use crate::core::consensus::mempool::Mempool;
@@ -26,7 +26,8 @@ pub mod test {
     use crate::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
     use crate::core::stat_thread::StatThread;
     use crate::core::util::configuration::{
-        BlockchainConfig, Configuration, ConsensusConfig, Endpoint, PeerConfig, Server,
+        get_default_issuance_writing_block_interval, BlockchainConfig, Configuration,
+        ConsensusConfig, Endpoint, PeerConfig, Server,
     };
     use crate::core::util::crypto::{generate_keypair_from_private_key, generate_keys};
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
@@ -58,7 +59,7 @@ pub mod test {
     pub struct TestConfiguration {
         server: Option<Server>,
         peers: Vec<PeerConfig>,
-        blockchain: Option<BlockchainConfig>,
+        blockchain: BlockchainConfig,
         spv_mode: bool,
         browser_mode: bool,
         #[serde(default = "get_default_consensus")]
@@ -73,8 +74,8 @@ pub mod test {
             &self.peers
         }
 
-        fn get_blockchain_configs(&self) -> Option<BlockchainConfig> {
-            self.blockchain.clone()
+        fn get_blockchain_configs(&self) -> &BlockchainConfig {
+            &self.blockchain
         }
 
         fn get_block_fetch_url(&self) -> String {
@@ -117,7 +118,24 @@ pub mod test {
                     block_fetch_batch_size: 0,
                 }),
                 peers: vec![],
-                blockchain: None,
+                blockchain: BlockchainConfig {
+                    last_block_hash:
+                        "0000000000000000000000000000000000000000000000000000000000000000"
+                            .to_string(),
+                    last_block_id: 0,
+                    last_timestamp: 0,
+                    genesis_block_id: 0,
+                    genesis_timestamp: 0,
+                    lowest_acceptable_timestamp: 0,
+                    lowest_acceptable_block_hash:
+                        "0000000000000000000000000000000000000000000000000000000000000000"
+                            .to_string(),
+                    lowest_acceptable_block_id: 0,
+                    fork_id: "0000000000000000000000000000000000000000000000000000000000000000"
+                        .to_string(),
+                    initial_loading_completed: false,
+                    issuance_writing_block_interval: get_default_issuance_writing_block_interval(),
+                },
                 spv_mode: false,
                 browser_mode: false,
                 consensus: Some(ConsensusConfig {
@@ -125,6 +143,8 @@ pub mod test {
                     heartbeat_interval: 5_000,
                     prune_after_blocks: 8,
                     max_staker_recursions: 3,
+                    default_social_stake: 0,
+                    default_social_stake_period: 60,
                 }),
             }
         }
@@ -179,6 +199,8 @@ pub mod test {
                 blockchain_lock: Arc::new(RwLock::new(Blockchain::new(
                     wallet.clone(),
                     genesis_period,
+                    0,
+                    60,
                 ))),
                 mempool_lock: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
                 wallet_lock: wallet.clone(),
@@ -252,6 +274,7 @@ pub mod test {
                     stat_sender: sender_to_stat.clone(),
                     config_lock: configuration.clone(),
                     produce_blocks_by_timer: true,
+                    delete_old_blocks: true,
                 },
                 mining_thread: MiningThread {
                     wallet_lock: context.wallet_lock.clone(),
@@ -379,7 +402,7 @@ pub mod test {
             self.verification_thread.process_timer_event(duration).await;
             self.last_run_time = self.timer.get_timestamp_in_ms();
         }
-        async fn run_until(&mut self, timestamp: Timestamp) -> Result<(), Error> {
+        pub async fn run_until(&mut self, timestamp: Timestamp) -> Result<(), Error> {
             let time_keeper = TestTimeKeeper {};
             loop {
                 if time_keeper.get_timestamp_in_ms() >= timestamp {
@@ -520,7 +543,7 @@ pub mod test {
                 .blockchain_lock
                 .write()
                 .await
-                .social_stake_requirement = if enable { DEFAULT_SOCIAL_STAKE } else { 0 };
+                .social_stake_requirement = if enable { 60 } else { 0 };
         }
         pub async fn set_staking_requirement(&self, amount: Currency, period: u64) {
             let mut blockchain = self.routing_thread.blockchain_lock.write().await;
@@ -531,6 +554,16 @@ pub mod test {
         pub async fn delete_blocks() -> Result<(), Error> {
             tokio::fs::create_dir_all("./data/blocks").await?;
             tokio::fs::remove_dir_all("./data/blocks/").await?;
+            Ok(())
+        }
+        pub async fn delete_checkpoints() -> Result<(), Error> {
+            tokio::fs::create_dir_all("./data/checkpoints").await?;
+            tokio::fs::remove_dir_all("./data/checkpoints/").await?;
+            Ok(())
+        }
+        pub async fn delete_data() -> Result<(), Error> {
+            tokio::fs::create_dir_all("./data").await?;
+            tokio::fs::remove_dir_all("./data/").await?;
             Ok(())
         }
         pub async fn create_block(

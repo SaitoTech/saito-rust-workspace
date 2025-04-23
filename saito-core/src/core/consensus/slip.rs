@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 
-use log::{debug, error};
+use log::{debug, error, trace};
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
@@ -162,7 +162,7 @@ impl Slip {
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, spendable: bool) {
         if self.amount > 0 {
             if spendable {
-                debug!(
+                trace!(
                     "adding slip to utxo : {:?}-{:?}-{:?} with value : {:?} key: {:?}",
                     self.block_id,
                     self.tx_ordinal,
@@ -172,7 +172,7 @@ impl Slip {
                 );
                 utxoset.insert(self.utxoset_key, spendable);
             } else {
-                debug!(
+                trace!(
                     "removing slip from utxo : {:?}-{:?}-{:?} with value : {:?} key: {:?}",
                     self.block_id,
                     self.tx_ordinal,
@@ -351,7 +351,12 @@ mod tests {
     async fn slip_addition_and_removal_from_utxoset() {
         let keys = generate_keys();
         let wallet_lock = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
-        let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone(), 1000)));
+        let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(
+            wallet_lock.clone(),
+            1000,
+            0,
+            60,
+        )));
         let mut blockchain = blockchain_lock.write().await;
 
         let mut slip = Slip::default();

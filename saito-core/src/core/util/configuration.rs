@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use crate::core::defs::Currency;
 use crate::core::defs::{BlockId, Timestamp};
 use serde::Deserialize;
 use serde::Serialize;
@@ -42,6 +43,12 @@ fn get_default_reconnection_wait_time() -> Timestamp {
 fn get_default_stat_timer() -> Timestamp {
     5_000
 }
+fn get_default_social_stake() -> Timestamp {
+    0
+}
+fn get_default_social_stake_period() -> Timestamp {
+    60
+}
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Server {
     #[serde(default)]
@@ -65,27 +72,36 @@ pub struct Server {
     pub reconnection_wait_time: Timestamp,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Serialize, Default)]
 pub struct BlockchainConfig {
     #[serde(default)]
     pub last_block_hash: String,
     #[serde(default)]
-    pub last_block_id: u64,
+    pub last_block_id: BlockId,
     #[serde(default)]
-    pub last_timestamp: u64,
+    pub last_timestamp: Timestamp,
     #[serde(default)]
-    pub genesis_block_id: u64,
+    pub genesis_block_id: BlockId,
     #[serde(default)]
-    pub genesis_timestamp: u64,
+    pub genesis_timestamp: Timestamp,
     #[serde(default)]
-    pub lowest_acceptable_timestamp: u64,
+    pub lowest_acceptable_timestamp: Timestamp,
     #[serde(default)]
     pub lowest_acceptable_block_hash: String,
     #[serde(default)]
-    pub lowest_acceptable_block_id: u64,
+    pub lowest_acceptable_block_id: BlockId,
     #[serde(default)]
     pub fork_id: String,
+    #[serde(skip)]
+    pub initial_loading_completed: bool,
+    #[serde(default = "get_default_issuance_writing_block_interval")]
+    pub issuance_writing_block_interval: BlockId,
 }
+
+pub fn get_default_issuance_writing_block_interval() -> BlockId {
+    10
+}
+
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct ConsensusConfig {
     #[serde(default = "get_default_genesis_period")]
@@ -96,7 +112,12 @@ pub struct ConsensusConfig {
     pub prune_after_blocks: u64,
     #[serde(default = "get_default_max_staker_recursions")]
     pub max_staker_recursions: BlockId,
+    #[serde(default = "get_default_social_stake")]
+    pub default_social_stake: Currency,
+    #[serde(default = "get_default_social_stake_period")]
+    pub default_social_stake_period: BlockId,
 }
+
 impl Default for ConsensusConfig {
     fn default() -> Self {
         ConsensusConfig {
@@ -104,6 +125,8 @@ impl Default for ConsensusConfig {
             heartbeat_interval: 5_000,
             prune_after_blocks: 8,
             max_staker_recursions: 3,
+            default_social_stake: 0,
+            default_social_stake_period: 60,
         }
     }
 }
@@ -111,7 +134,7 @@ impl Default for ConsensusConfig {
 pub trait Configuration: Debug {
     fn get_server_configs(&self) -> Option<&Server>;
     fn get_peer_configs(&self) -> &Vec<PeerConfig>;
-    fn get_blockchain_configs(&self) -> Option<BlockchainConfig>;
+    fn get_blockchain_configs(&self) -> &BlockchainConfig;
     fn get_block_fetch_url(&self) -> String;
     fn is_spv_mode(&self) -> bool;
     fn is_browser(&self) -> bool;

@@ -37,7 +37,8 @@ export default class Saito {
         factory = new Factory(),
         privateKey: string,
         logLevel: LogLevel,
-        haste_multiplier: bigint
+        haste_multiplier: bigint,
+        deleteOldBlocks: boolean
     ) {
         console.log("initializing saito lib");
         Saito.instance = new Saito(factory);
@@ -151,7 +152,7 @@ export default class Saito {
         }
 
         let configStr = JSON.stringify(configs);
-        await Saito.getLibInstance().initialize(configStr, privateKey, logLevel, haste_multiplier);
+        await Saito.getLibInstance().initialize(configStr, privateKey, logLevel, haste_multiplier, deleteOldBlocks);
 
         let blockchain = await Saito.getInstance().getBlockchain();
         console.log("last callback block id set as : " + configs.blockchain.last_block_id);

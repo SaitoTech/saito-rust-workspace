@@ -11,20 +11,20 @@ export default class Nft extends WasmWrapper<WasmNFT> {
         super(nft!);
     }
 
-    public get nft_id(): Uint8Array {
-        return this.instance.nft_id;
+    public get id(): Uint8Array {
+        return this.instance.id;
     }
 
-    public get nft_slip2_utxokey(): Uint8Array {
-        return this.instance.nft_slip2_utxokey;
+    public get slip1(): Uint8Array {
+        return this.instance.slip1;
     }
 
-    public get nft_slip1_utxokey(): Uint8Array {
-        return this.instance.nft_slip1_utxokey;
+    public get slip2(): Uint8Array {
+        return this.instance.slip2;
     }
 
-    public get normal_slip_utxokey(): Uint8Array {
-        return this.instance.normal_slip_utxokey;
+    public get slip3(): Uint8Array {
+        return this.instance.slip3;
     }
 
     public get tx_sig(): Uint8Array {
@@ -44,10 +44,10 @@ export default class Nft extends WasmWrapper<WasmNFT> {
     // Convert NFT data to a JSON-friendly format
     public toJSON(): Record<string, string> {
         return {
-            nft_id: Buffer.from(this.nft_id).toString("hex"),
-            nft_slip2_utxokey: Buffer.from(this.nft_slip2_utxokey).toString("hex"),
-            nft_slip1_utxokey: Buffer.from(this.nft_slip1_utxokey).toString("hex"),
-            normal_slip_utxokey: Buffer.from(this.normal_slip_utxokey).toString("hex"),
+            id: Buffer.from(this.id).toString("hex"),
+            slip1: Buffer.from(this.slip1).toString("hex"),
+            slip2: Buffer.from(this.slip2).toString("hex"),
+            slip3: Buffer.from(this.slip3).toString("hex"),
             tx_sig: Buffer.from(this.tx_sig).toString("hex"),
         };
     }

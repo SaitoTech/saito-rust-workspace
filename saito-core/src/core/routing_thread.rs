@@ -133,6 +133,7 @@ impl RoutingThread {
                     .await;
             }
             Message::HandshakeResponse(response) => {
+                trace!("received handshake response from peer : {:?}", peer_index);
                 self.network
                     .handle_handshake_response(
                         peer_index,
@@ -145,11 +146,22 @@ impl RoutingThread {
             }
 
             Message::Transaction(transaction) => {
+                trace!(
+                    "received transaction : {} from peer : {:?}",
+                    transaction.signature.to_hex(),
+                    peer_index
+                );
                 self.stats.received_transactions.increment();
                 self.send_to_verification_thread(VerifyRequest::Transaction(transaction))
                     .await;
             }
             Message::BlockchainRequest(request) => {
+                trace!(
+                    "received blockchain request from peer : {:?} with block id : {:?} and hash : {:?}",
+                    peer_index,
+                    request.latest_block_id,
+                    request.latest_block_hash.to_hex()
+                );
                 {
                     let configs = self.config_lock.read().await;
                     if configs.is_browser() || configs.is_spv_mode() {
@@ -161,6 +173,12 @@ impl RoutingThread {
                     .await;
             }
             Message::BlockHeaderHash(hash, block_id) => {
+                trace!(
+                    "received block header hash from peer : {:?} with block id : {:?} and hash : {:?}",
+                    peer_index,
+                    block_id,
+                    hash.to_hex()
+                );
                 self.process_incoming_block_hash(hash, block_id, peer_index)
                     .await;
             }
@@ -275,6 +293,11 @@ impl RoutingThread {
         peer_key_list: Vec<SaitoPublicKey>,
         storage: &Storage,
     ) -> GhostChainSync {
+        debug!(
+            "generating ghost chain for block_id : {:?} fork_id : {:?}",
+            block_id,
+            fork_id.to_hex()
+        );
         let mut last_shared_ancestor = blockchain.generate_last_shared_ancestor(block_id, fork_id);
 
         debug!("last_shared_ancestor 1 : {:?}", last_shared_ancestor);
@@ -546,10 +569,17 @@ impl RoutingThread {
                 .expect("sender should be here as we are using the modulus on index");
 
             if sender.capacity() > 0 {
+                trace!("sending to verification thread : {:?}", sender_index);
                 sender.send(request).await.unwrap();
 
                 return;
             }
+            trace!(
+                "verification thread sender : {:?} is full. capacity : {:?} max capacity : {:?}",
+                sender_index,
+                sender.capacity(),
+                sender.max_capacity()
+            );
             if trials == sender_count {
                 // todo : if all the channels are full, we should wait here. cannot sleep to support wasm interface
                 trials = 0;
@@ -700,6 +730,11 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
         match event {
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
+                trace!(
+                    "processing incoming network message from peer : {:?} of size : {}",
+                    peer_index,
+                    buffer.len()
+                );
                 {
                     // TODO : move this before deserialization to avoid spending CPU time on it. moved here to just print message type
                     let mut peers = self.network.peer_lock.write().await;
@@ -974,9 +1009,9 @@ mod tests {
     #[serial_test::serial]
     async fn test_ghost_chain_gen() {
         // pretty_env_logger::init();
-        NodeTester::delete_blocks().await.unwrap();
+        NodeTester::delete_data().await.unwrap();
         let peer_public_key = generate_keys().0;
-        let mut tester = NodeTester::default();
+        let mut tester = NodeTester::new(1000, None, None);
         tester
             .init_with_staking(0, 60, 100_000 * NOLAN_PER_SAITO)
             .await

@@ -27,7 +27,8 @@ export async function initialize(
   factory: Factory,
   privateKey: string,
   logLevel: LogLevel = LogLevel.Info,
-  haste_multiplier: bigint
+  haste_multiplier: bigint,
+  delete_old_blocks: boolean
 ) {
   if (Saito.getLibInstance()) {
     console.error("saito already initialized");
@@ -65,7 +66,8 @@ export async function initialize(
         factory,
         privateKey,
         logLevel,
-        haste_multiplier
+        haste_multiplier,
+        delete_old_blocks
       );
     });
 }

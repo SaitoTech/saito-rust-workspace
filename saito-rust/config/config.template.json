@@ -15,6 +15,17 @@
     "thread_sleep_time_in_ms": 10,
     "block_fetch_batch_size": 10
   },
+  "blockchain": {
+    "last_block_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "last_block_id": 0,
+    "last_timestamp": 0,
+    "genesis_block_id": 0,
+    "genesis_timestamp": 0,
+    "lowest_acceptable_timestamp": 0,
+    "lowest_acceptable_block_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "lowest_acceptable_block_id": 0,
+    "fork_id": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
   "peers": [
     {
       "host": "127.0.0.1",

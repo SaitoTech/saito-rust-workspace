@@ -69,13 +69,21 @@ pub struct SaitoWasm {
 }
 
 lazy_static! {
-    pub static ref SAITO: Mutex<Option<SaitoWasm>> = Mutex::new(Some(new(1, true, 100_000)));
+    pub static ref SAITO: Mutex<Option<SaitoWasm>> =
+        Mutex::new(Some(new(1, true, 100_000, 0, 60, false)));
     static ref CONFIGS: Arc<RwLock<dyn Configuration + Send + Sync>> =
         Arc::new(RwLock::new(WasmConfiguration::new()));
     static ref PRIVATE_KEY: Mutex<String> = Mutex::new("".to_string());
 }
 
-pub fn new(haste_multiplier: u64, enable_stats: bool, genesis_period: BlockId) -> SaitoWasm {
+pub fn new(
+    haste_multiplier: u64,
+    enable_stats: bool,
+    genesis_period: BlockId,
+    social_stake: Currency,
+    social_stake_period: BlockId,
+    delete_old_blocks: bool,
+) -> SaitoWasm {
     info!("creating new saito wasm instance");
     console_error_panic_hook::set_once();
 
@@ -95,7 +103,12 @@ pub fn new(haste_multiplier: u64, enable_stats: bool, genesis_period: BlockId) -
 
     let peers = Arc::new(RwLock::new(PeerCollection::default()));
     let context = Context {
-        blockchain_lock: Arc::new(RwLock::new(Blockchain::new(wallet.clone(), genesis_period))),
+        blockchain_lock: Arc::new(RwLock::new(Blockchain::new(
+            wallet.clone(),
+            genesis_period,
+            social_stake,
+            social_stake_period,
+        ))),
         mempool_lock: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
         wallet_lock: wallet.clone(),
         config_lock: configuration.clone(),
@@ -148,7 +161,6 @@ pub fn new(haste_multiplier: u64, enable_stats: bool, genesis_period: BlockId) -
             generate_genesis_block: false,
             sender_to_router: sender_to_blockchain.clone(),
             sender_to_miner: sender_to_miner.clone(),
-            // sender_global: (),
             block_producing_timer: 0,
             timer: timer.clone(),
             network: Network::new(
@@ -164,6 +176,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool, genesis_period: BlockId) -
             stat_sender: sender_to_stat.clone(),
             config_lock: configuration.clone(),
             produce_blocks_by_timer: true,
+            delete_old_blocks,
         },
         mining_thread: MiningThread {
             wallet_lock: context.wallet_lock.clone(),
@@ -328,7 +341,10 @@ pub async fn initialize(
     private_key: JsString,
     log_level_num: u8,
     hasten_multiplier: u64,
+    delete_old_blocks: bool,
 ) -> Result<JsValue, JsValue> {
+    // TODO : move these parameters to a config object to clean the interface
+
     let log_level = match log_level_num {
         0 => log::Level::Error,
         1 => log::Level::Warn,
@@ -349,6 +365,8 @@ pub async fn initialize(
 
     let mut enable_stats = true;
     let mut genesis_period = 100_000;
+    let mut social_stake = 0;
+    let mut social_stake_period = 60;
     {
         info!("setting configs...");
         let mut configs = CONFIGS.write().await;
@@ -365,14 +383,28 @@ pub async fn initialize(
                 enable_stats = false;
             }
             info!("config : {:?}", config);
-            genesis_period = configs.get_consensus_config().unwrap().genesis_period;
             configs.replace(&config);
+            genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+            social_stake = configs.get_consensus_config().unwrap().default_social_stake;
+            social_stake_period = configs
+                .get_consensus_config()
+                .unwrap()
+                .default_social_stake_period;
         }
     }
 
     let mut saito = SAITO.lock().await;
 
-    saito.replace(new(hasten_multiplier, enable_stats, genesis_period));
+    info!("genesis_period = {:?}", genesis_period);
+    info!("social_stake = {:?}", social_stake);
+    saito.replace(new(
+        hasten_multiplier,
+        enable_stats,
+        genesis_period,
+        social_stake,
+        social_stake_period,
+        delete_old_blocks,
+    ));
 
     let private_key: SaitoPrivateKey = string_to_hex(private_key).or(Err(JsValue::from(
         "Failed parsing private key string to key",
@@ -1248,56 +1280,59 @@ pub async fn write_issuance_file(threshold: Currency) {
         .routing_thread
         .blockchain_lock
         .clone();
-    let storage = &mut saito.as_mut().unwrap().consensus_thread.storage;
-    let _list = storage.load_block_name_list().await.unwrap();
+    let mut storage = &mut saito.as_mut().unwrap().consensus_thread.storage;
+    // let _list = storage.load_block_name_list().await.unwrap();
 
     let blockchain = blockchain_lock.write().await;
+    blockchain
+        .write_issuance_file(threshold, &mut storage)
+        .await;
 
-    info!("utxo size : {:?}", blockchain.utxoset.len());
+    // info!("utxo size : {:?}", blockchain.utxoset.len());
 
-    let data = blockchain.get_utxoset_data();
+    // let data = blockchain.get_utxoset_data();
 
-    info!("{:?} entries in utxo to write to file", data.len());
-    let issuance_path: String = "./data/issuance.file".to_string();
-    info!("opening file : {:?}", issuance_path);
+    // info!("{:?} entries in utxo to write to file", data.len());
+    // let issuance_path: String = "./data/issuance.file".to_string();
+    // info!("opening file : {:?}", issuance_path);
 
-    let mut buffer: Vec<u8> = vec![];
-    let slip_type = "Normal";
-    let mut aggregated_value = 0;
-    let mut total_written_lines = 0;
-    for (key, value) in &data {
-        if value < &threshold {
-            aggregated_value += value;
-        } else {
-            total_written_lines += 1;
-            let key_base58 = key.to_base58();
+    // let mut buffer: Vec<u8> = vec![];
+    // let slip_type = "Normal";
+    // let mut aggregated_value = 0;
+    // let mut total_written_lines = 0;
+    // for (key, value) in &data {
+    //     if value < &threshold {
+    //         aggregated_value += value;
+    //     } else {
+    //         total_written_lines += 1;
+    //         let key_base58 = key.to_base58();
 
-            let s = format!("{}\t{}\t{}\n", value, key_base58, slip_type);
-            let buf = s.as_bytes();
-            buffer.extend(buf);
-        };
-    }
+    //         let s = format!("{}\t{}\t{}\n", value, key_base58, slip_type);
+    //         let buf = s.as_bytes();
+    //         buffer.extend(buf);
+    //     };
+    // }
 
-    // add remaining value
-    if aggregated_value > 0 {
-        total_written_lines += 1;
-        let s = format!(
-            "{}\t{}\t{}\n",
-            aggregated_value,
-            PROJECT_PUBLIC_KEY.to_string(),
-            slip_type
-        );
-        let buf = s.as_bytes();
-        buffer.extend(buf);
-    }
+    // // add remaining value
+    // if aggregated_value > 0 {
+    //     total_written_lines += 1;
+    //     let s = format!(
+    //         "{}\t{}\t{}\n",
+    //         aggregated_value,
+    //         PROJECT_PUBLIC_KEY.to_string(),
+    //         slip_type
+    //     );
+    //     let buf = s.as_bytes();
+    //     buffer.extend(buf);
+    // }
 
-    storage
-        .io_interface
-        .write_value(issuance_path.as_str(), buffer.as_slice())
-        .await
-        .expect("issuance file should be written");
+    // storage
+    //     .io_interface
+    //     .write_value(issuance_path.as_str(), buffer.as_slice())
+    //     .await
+    //     .expect("issuance file should be written");
 
-    info!("total written lines : {:?}", total_written_lines);
+    // info!("total written lines : {:?}", total_written_lines);
 }
 
 #[wasm_bindgen]

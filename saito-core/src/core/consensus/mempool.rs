@@ -14,6 +14,7 @@ use crate::core::consensus::burnfee::BurnFee;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
+use crate::core::defs::SaitoUTXOSetKey;
 use crate::core::defs::{
     Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, StatVariable, Timestamp,
 };
@@ -48,6 +49,7 @@ pub struct Mempool {
     routing_work_in_mempool: Currency,
     pub new_tx_added: bool,
     pub wallet_lock: Arc<RwLock<Wallet>>,
+    pub utxo_map: AHashMap<SaitoUTXOSetKey, u64>,
 }
 
 impl Mempool {
@@ -60,6 +62,7 @@ impl Mempool {
             routing_work_in_mempool: 0,
             new_tx_added: false,
             wallet_lock,
+            utxo_map: AHashMap::new(),
         }
     }
 
@@ -134,6 +137,19 @@ impl Mempool {
         // );
 
         debug_assert!(transaction.hash_for_signature.is_some());
+
+        for input in transaction.from.iter() {
+            let utxo_key = input.utxoset_key;
+            if self.utxo_map.contains_key(&utxo_key) && input.amount > 0 {
+                // Duplicate input found, reject transaction
+                warn!(
+                    "duplicate input : \n{} found in transaction : \n{}",
+                    input, transaction
+                );
+                return;
+            }
+        }
+
         // this assigns the amount of routing work that this transaction
         // contains to us, which is why we need to provide our public_key
         // so that we can calculate routing work.
@@ -151,8 +167,14 @@ impl Mempool {
             if let TransactionType::GoldenTicket = transaction.transaction_type {
                 panic!("golden tickets should be in gt collection");
             } else {
-                self.transactions.insert(transaction.signature, transaction);
+                self.transactions
+                    .insert(transaction.signature, transaction.clone());
                 self.new_tx_added = true;
+
+                for input in transaction.from.iter() {
+                    let utxo_key = input.utxoset_key;
+                    self.utxo_map.insert(utxo_key, 1);
+                }
             }
         }
     }
@@ -210,7 +232,8 @@ impl Mempool {
                 )
                 .ok()?;
         }
-        self.add_transaction(staking_tx).await;
+        self.add_transaction_if_validates(staking_tx, blockchain)
+            .await;
 
         let mut block = Block::create(
             &mut self.transactions,
@@ -223,8 +246,9 @@ impl Mempool {
             configs,
             storage,
         )
-        .await;
-        block.generate();
+        .await
+        .ok()?;
+        block.generate().ok()?;
         debug!(
             "block generated with work : {:?} and burnfee : {:?} gts : {:?}",
             block.total_work,
@@ -238,6 +262,13 @@ impl Mempool {
         // assert_eq!(block.total_work, mempool_work);
         self.new_tx_added = false;
         self.routing_work_in_mempool = 0;
+
+        for tx in &block.transactions {
+            for input in &tx.from {
+                let utxo_key = input.utxoset_key;
+                self.utxo_map.remove(&utxo_key);
+            }
+        }
 
         Some(block)
     }
@@ -268,8 +299,9 @@ impl Mempool {
             configs,
             storage,
         )
-        .await;
-        block.generate();
+        .await
+        .unwrap();
+        block.generate().unwrap();
         self.new_tx_added = false;
         self.routing_work_in_mempool = 0;
 

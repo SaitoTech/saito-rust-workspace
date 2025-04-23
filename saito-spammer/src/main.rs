@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use log::info;
 use log::{debug, error};
+use saito_rust::run_thread::run_thread;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -45,80 +46,80 @@ const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
 const _MINING_EVENT_PROCESSOR_ID: u8 = 3;
 
-async fn run_thread<T>(
-    mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
-    mut network_event_receiver: Option<Receiver<NetworkEvent>>,
-    mut event_receiver: Option<Receiver<T>>,
-    stat_timer_in_ms: u64,
-    thread_sleep_time_in_ms: u64,
-) -> JoinHandle<()>
-where
-    T: Send + 'static,
-{
-    tokio::spawn(async move {
-        info!("new thread started");
-        let mut work_done = false;
-        let mut last_timestamp = Instant::now();
-        let mut stat_timer = Instant::now();
-        let time_keeper = TimeKeeper {};
+// async fn run_thread<T>(
+//     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
+//     mut network_event_receiver: Option<Receiver<NetworkEvent>>,
+//     mut event_receiver: Option<Receiver<T>>,
+//     stat_timer_in_ms: u64,
+//     thread_sleep_time_in_ms: u64,
+// ) -> JoinHandle<()>
+// where
+//     T: Send + 'static,
+// {
+//     tokio::spawn(async move {
+//         info!("new thread started");
+//         let mut work_done = false;
+//         let mut last_timestamp = Instant::now();
+//         let mut stat_timer = Instant::now();
+//         let time_keeper = TimeKeeper {};
 
-        event_processor.on_init().await;
+//         event_processor.on_init().await;
 
-        loop {
-            if network_event_receiver.is_some() {
-                // TODO : update to recv().await
-                let result = network_event_receiver.as_mut().unwrap().try_recv();
-                if result.is_ok() {
-                    let event = result.unwrap();
-                    if event_processor.process_network_event(event).await.is_some() {
-                        work_done = true;
-                    }
-                }
-            }
+//         loop {
+//             if network_event_receiver.is_some() {
+//                 // TODO : update to recv().await
+//                 let result = network_event_receiver.as_mut().unwrap().try_recv();
+//                 if result.is_ok() {
+//                     let event = result.unwrap();
+//                     if event_processor.process_network_event(event).await.is_some() {
+//                         work_done = true;
+//                     }
+//                 }
+//             }
 
-            if event_receiver.is_some() {
-                // TODO : update to recv().await
-                let result = event_receiver.as_mut().unwrap().try_recv();
-                if result.is_ok() {
-                    let event = result.unwrap();
-                    if event_processor.process_event(event).await.is_some() {
-                        work_done = true;
-                    }
-                }
-            }
+//             if event_receiver.is_some() {
+//                 // TODO : update to recv().await
+//                 let result = event_receiver.as_mut().unwrap().try_recv();
+//                 if result.is_ok() {
+//                     let event = result.unwrap();
+//                     if event_processor.process_event(event).await.is_some() {
+//                         work_done = true;
+//                     }
+//                 }
+//             }
 
-            let current_instant = Instant::now();
-            let duration = current_instant.duration_since(last_timestamp);
-            last_timestamp = current_instant;
+//             let current_instant = Instant::now();
+//             let duration = current_instant.duration_since(last_timestamp);
+//             last_timestamp = current_instant;
 
-            if event_processor
-                .process_timer_event(duration)
-                .await
-                .is_some()
-            {
-                work_done = true;
-            }
+//             if event_processor
+//                 .process_timer_event(duration)
+//                 .await
+//                 .is_some()
+//             {
+//                 work_done = true;
+//             }
 
-            {
-                let duration = current_instant.duration_since(stat_timer);
-                if duration > Duration::from_millis(stat_timer_in_ms) {
-                    stat_timer = current_instant;
-                    event_processor
-                        .on_stat_interval(time_keeper.get_timestamp_in_ms())
-                        .await;
-                }
-            }
+//             {
+//                 let duration = current_instant.duration_since(stat_timer);
+//                 if duration > Duration::from_millis(stat_timer_in_ms) {
+//                     stat_timer = current_instant;
+//                     event_processor
+//                         .on_stat_interval(time_keeper.get_timestamp_in_ms())
+//                         .await;
+//                 }
+//             }
 
-            if work_done {
-                work_done = false;
-                // tokio::task::yield_now().await;
-            } else {
-                // tokio::task::yield_now().await;
-                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
-            }
-        }
-    })
-}
+//             if work_done {
+//                 work_done = false;
+//                 // tokio::task::yield_now().await;
+//             } else {
+//                 // tokio::task::yield_now().await;
+//                 tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
+//             }
+//         }
+//     })
+// }
 
 async fn run_mining_event_processor(
     context: &Context,
@@ -152,7 +153,9 @@ async fn run_mining_event_processor(
         None,
         Some(receiver_for_miner),
         stat_timer_in_ms,
+        "mining_thread",
         thread_sleep_time_in_ms,
+        timer,
     )
     .await;
     miner_handle
@@ -205,6 +208,7 @@ async fn run_consensus_event_processor(
         stat_sender: sender_to_stat.clone(),
         config_lock: context.config_lock.clone(),
         produce_blocks_by_timer: true,
+        delete_old_blocks: true,
     };
 
     debug!("running mempool thread");
@@ -213,7 +217,9 @@ async fn run_consensus_event_processor(
         None,
         Some(receiver_for_blockchain),
         stat_timer_in_ms,
+        "consensus_thread",
         thread_sleep_time_in_ms,
+        timer,
     )
     .await;
 
@@ -229,6 +235,7 @@ async fn run_verification_threads(
     thread_sleep_time_in_ms: u64,
     verification_thread_count: u16,
     sender_to_stat: Sender<String>,
+    timer: &Timer,
 ) -> (Vec<Sender<VerifyRequest>>, Vec<JoinHandle<()>>) {
     let mut senders = vec![];
     let mut thread_handles = vec![];
@@ -269,7 +276,9 @@ async fn run_verification_threads(
             None,
             Some(receiver),
             stat_timer_in_ms,
+            "verification_thread",
             thread_sleep_time_in_ms,
+            timer,
         )
         .await;
         thread_handles.push(thread_handle);
@@ -335,7 +344,9 @@ async fn run_routing_event_processor(
         Some(interface_receiver_for_routing),
         Some(receiver_for_routing),
         stat_timer_in_ms,
+        "routing_thread",
         thread_sleep_time_in_ms,
+        timer,
     )
     .await;
 
@@ -379,7 +390,34 @@ fn run_loop_thread(
 
     loop_handle
 }
+fn setup_log() {
+    // switch to this for instrumentation
+    // console_subscriber::init();
 
+    let filter = tracing_subscriber::EnvFilter::builder()
+        .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+        .from_env_lossy();
+    let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("tokio::task=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("runtime::resource=info").unwrap());
+
+    // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
+
+    let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+    // let fmt_layer = fmt_layer.with_filter(FilterFn::new(|meta| {
+    //     !meta.target().contains("waker.clone") && !meta.target().contains("waker.drop") &&
+    // }));
+
+    tracing_subscriber::registry().with(fmt_layer).init();
+}
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ctrlc::set_handler(move || {
@@ -407,23 +445,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Running saito");
 
-    // install global subscriber configured based on RUST_LOG envvar.
+    setup_log();
 
-    let filter = tracing_subscriber::EnvFilter::from_default_env();
-    let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
-    // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
-
-    let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
-
-    tracing_subscriber::registry().with(fmt_layer).init();
     let public_key: SaitoPublicKey =
         hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
             .unwrap()
@@ -448,6 +471,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let verification_thread_count;
     let fetch_batch_size: usize;
     let genesis_period;
+    let social_stake;
+    let social_stake_period;
     {
         let configs = configs_lock.read().await;
 
@@ -460,6 +485,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         verification_thread_count = configs.get_server_configs().unwrap().verification_threads;
         fetch_batch_size = configs.get_server_configs().unwrap().block_fetch_batch_size as usize;
         genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+        social_stake = configs.get_consensus_config().unwrap().default_social_stake;
+        social_stake_period = configs
+            .get_consensus_config()
+            .unwrap()
+            .default_social_stake_period;
     }
 
     let timer = Timer {
@@ -486,7 +516,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(channel_size);
         Wallet::load(&mut wallet, &(RustIOHandler::new(sender, 1))).await;
     }
-    let context = Context::new(configs_clone.clone(), wallet, genesis_period);
+    let context = Context::new(
+        configs_clone.clone(),
+        wallet,
+        genesis_period,
+        social_stake,
+        social_stake_period,
+    );
 
     let peers_lock = Arc::new(RwLock::new(PeerCollection::default()));
 
@@ -510,6 +546,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         thread_sleep_time_in_ms,
         verification_thread_count,
         sender_to_stat.clone(),
+        &timer,
     )
     .await;
 
@@ -564,7 +601,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None,
         Some(receiver_for_stat),
         stat_timer_in_ms,
+        "stat_thread",
         thread_sleep_time_in_ms,
+        &timer,
     )
     .await;
 
