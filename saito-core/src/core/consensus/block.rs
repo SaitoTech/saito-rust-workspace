@@ -1510,7 +1510,7 @@ impl Block {
                         )
                         .await
                     {
-                        atr_block.generate().unwrap();
+                        atr_block.generate();
                         assert_ne!(
                             atr_block.block_type,
                             BlockType::Pruned,
