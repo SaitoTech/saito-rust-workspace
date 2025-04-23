@@ -2,7 +2,6 @@ use std::cmp::max;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::io::Error;
-use std::ops::Deref;
 use std::sync::Arc;
 
 use ahash::{AHashMap, HashMap};
