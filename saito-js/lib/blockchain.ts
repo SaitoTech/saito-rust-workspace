@@ -214,4 +214,6 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
     public async setSafeToPruneTransaction(blockId: bigint) {
       return this.instance.set_safe_to_prune_transaction(blockId);
     }
+
+    
 }

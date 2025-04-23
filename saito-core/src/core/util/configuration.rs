@@ -77,24 +77,31 @@ pub struct BlockchainConfig {
     #[serde(default)]
     pub last_block_hash: String,
     #[serde(default)]
-    pub last_block_id: u64,
+    pub last_block_id: BlockId,
     #[serde(default)]
-    pub last_timestamp: u64,
+    pub last_timestamp: Timestamp,
     #[serde(default)]
-    pub genesis_block_id: u64,
+    pub genesis_block_id: BlockId,
     #[serde(default)]
-    pub genesis_timestamp: u64,
+    pub genesis_timestamp: Timestamp,
     #[serde(default)]
-    pub lowest_acceptable_timestamp: u64,
+    pub lowest_acceptable_timestamp: Timestamp,
     #[serde(default)]
     pub lowest_acceptable_block_hash: String,
     #[serde(default)]
-    pub lowest_acceptable_block_id: u64,
+    pub lowest_acceptable_block_id: BlockId,
     #[serde(default)]
     pub fork_id: String,
     #[serde(skip)]
     pub initial_loading_completed: bool,
+    #[serde(default = "get_default_issuance_writing_block_interval")]
+    pub issuance_writing_block_interval: BlockId,
 }
+
+pub fn get_default_issuance_writing_block_interval() -> BlockId {
+    10
+}
+
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct ConsensusConfig {
     #[serde(default = "get_default_genesis_period")]

@@ -2,6 +2,7 @@ use std::cmp::max;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::io::Error;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use ahash::{AHashMap, HashMap};
@@ -19,6 +20,7 @@ use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDA
 use crate::core::defs::{
     BlockHash, BlockId, Currency, ForkId, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey,
     Timestamp, UtxoSet, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR,
+    PROJECT_PUBLIC_KEY,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
@@ -97,6 +99,8 @@ pub struct Blockchain {
     pub genesis_period: BlockId,
 
     pub checkpoint_found: bool,
+    pub initial_token_supply: Currency,
+    pub last_issuance_written_on: BlockId,
 }
 
 impl Blockchain {
@@ -129,6 +133,8 @@ impl Blockchain {
             social_stake_period,
             genesis_period,
             checkpoint_found: false,
+            initial_token_supply: 0,
+            last_issuance_written_on: 0,
         }
     }
     pub fn init(&mut self) -> Result<(), Error> {
@@ -423,6 +429,9 @@ impl Blockchain {
             // );
 
             if does_new_chain_validate {
+                // crash if total supply has changed
+                self.check_total_supply(configs).await;
+
                 self.add_block_success(block_hash, storage, mempool, configs)
                     .await;
 
@@ -530,6 +539,17 @@ impl Blockchain {
             {
                 // TODO : this will have an impact when the block sizes are getting large or there are many forks. need to handle this
                 storage.write_block_to_disk(block).await;
+
+                let writing_interval = configs
+                    .get_blockchain_configs()
+                    .issuance_writing_block_interval;
+
+                if writing_interval > 0
+                    && block_id >= self.last_issuance_written_on + writing_interval
+                {
+                    self.write_issuance_file(0, storage).await;
+                    self.last_issuance_written_on = block_id;
+                }
             } else if block.block_type == BlockType::Header {
                 debug!(
                     "block : {:?} not written to disk as type : {:?}",
@@ -562,6 +582,61 @@ impl Blockchain {
             block_type,
             tx_count
         );
+    }
+
+    pub async fn write_issuance_file(&self, threshold: Currency, storage: &mut Storage) {
+        info!("utxo size : {:?}", self.utxoset.len());
+
+        let data = self.get_utxoset_data();
+
+        info!("{:?} entries in utxo to write to file", data.len());
+        let latest_block = self.get_latest_block().unwrap();
+        let issuance_path = format!(
+            "./data/issuance/block_{}_{}_{}.issuance",
+            latest_block.timestamp,
+            latest_block.hash.to_hex(),
+            latest_block.id
+        );
+
+        info!("opening file : {:?}", issuance_path);
+
+        let mut buffer: Vec<u8> = vec![];
+        let slip_type = "Normal";
+        let mut aggregated_value = 0;
+        let mut total_written_lines = 0;
+        for (key, value) in &data {
+            if value < &threshold {
+                aggregated_value += value;
+            } else {
+                total_written_lines += 1;
+                let key_base58 = key.to_base58();
+
+                let s = format!("{}\t{}\t{}\n", value, key_base58, slip_type);
+                let buf = s.as_bytes();
+                buffer.extend(buf);
+            };
+        }
+
+        // add remaining value
+        if aggregated_value > 0 {
+            total_written_lines += 1;
+            let s = format!(
+                "{}\t{}\t{}\n",
+                aggregated_value,
+                PROJECT_PUBLIC_KEY.to_string(),
+                slip_type
+            );
+            let buf = s.as_bytes();
+            buffer.extend(buf);
+        }
+
+        storage
+            .io_interface
+            .write_value(issuance_path.as_str(), buffer.as_slice())
+            .await
+            .expect("issuance file should be written");
+
+        info!("total written lines : {:?}", total_written_lines);
     }
 
     fn remove_block_transactions(&self, block_hash: &SaitoHash, mempool: &mut Mempool) {
@@ -1187,34 +1262,14 @@ impl Blockchain {
         let does_block_validate;
         {
             debug!("winding hash validates: {:?}", block_hash.to_hex());
-            // does_block_validate = current_wind_index == 0
-            //     || block
-            //         .validate(self, &self.utxoset, configs, storage, &wallet)
-            //         .await;
-            let has_first_block = self
-                .blockring
-                .get_longest_chain_block_hash_at_block_id(1)
-                .is_some();
             let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
-            let latest_block_id = self.get_latest_block_id();
-            let mut has_genesis_period_of_blocks = false;
-            if latest_block_id > genesis_period {
-                let result = self
-                    .blockring
-                    .get_longest_chain_block_hash_at_block_id(latest_block_id - genesis_period);
-                has_genesis_period_of_blocks = result.is_some();
-            }
-            // let has_genesis_period_of_blocks = self.get_latest_block_id()
-            //     > configs.get_consensus_config().unwrap().genesis_period + self.genesis_block_id;
-            let validate_against_utxo = has_first_block || has_genesis_period_of_blocks;
+            let validate_against_utxo = self.has_total_supply_loaded(genesis_period);
 
             does_block_validate = block
                 .validate(self, &self.utxoset, configs, storage, validate_against_utxo)
                 .await;
 
             if !does_block_validate {
-                debug!("validate against utxo: {:?}, has_first_block : {:?}, has_genesis_period_of_blocks : {:?}", 
-                    validate_against_utxo,has_first_block,has_genesis_period_of_blocks);
                 debug!("latest_block_id = {:?}", self.get_latest_block_id());
                 debug!("genesis_block_id = {:?}", self.genesis_block_id);
                 debug!(
@@ -1392,6 +1447,22 @@ impl Blockchain {
                 }
             }
         }
+    }
+
+    fn has_total_supply_loaded(&self, genesis_period: BlockId) -> bool {
+        let has_genesis_block = self
+            .blockring
+            .get_longest_chain_block_hash_at_block_id(1)
+            .is_some();
+        let latest_block_id = self.get_latest_block_id();
+        let mut has_genesis_period_of_blocks = false;
+        if latest_block_id > genesis_period {
+            let result = self
+                .blockring
+                .get_longest_chain_block_hash_at_block_id(latest_block_id - genesis_period);
+            has_genesis_period_of_blocks = result.is_some();
+        }
+        has_genesis_block || has_genesis_period_of_blocks
     }
 
     // when new_chain and old_chain are generated the block_hashes are pushed
@@ -2071,6 +2142,79 @@ impl Blockchain {
             return 0;
         }
         current_supply
+    }
+    pub async fn check_total_supply(&mut self, configs: &(dyn Configuration + Send + Sync)) {
+        if !self.has_total_supply_loaded(configs.get_consensus_config().unwrap().genesis_period) {
+            debug!("total supply not loaded yet. skipping check");
+            return;
+        }
+        if configs.is_browser() || configs.is_spv_mode() {
+            debug!("skipping total supply check in spv mode");
+            return;
+        }
+
+        let mut current_supply = 0;
+        let amount_in_utxo = self
+            .utxoset
+            .iter()
+            .filter(|(_, value)| **value)
+            .map(|(key, value)| {
+                let slip = Slip::parse_slip_from_utxokey(key).unwrap();
+                info!(
+                    "Utxo : {:?} : {} : {:?}, block : {}-{}-{}, valid : {}",
+                    slip.public_key.to_base58(),
+                    slip.amount,
+                    slip.slip_type,
+                    slip.block_id,
+                    slip.tx_ordinal,
+                    slip.slip_index,
+                    value
+                );
+                slip.amount
+            })
+            .sum::<Currency>();
+
+        current_supply += amount_in_utxo;
+
+        let latest_block = self
+            .get_latest_block()
+            .expect("There should be a latest block in blockchain");
+        current_supply += latest_block.graveyard;
+        current_supply += latest_block.treasury;
+        current_supply += latest_block.previous_block_unpaid;
+        current_supply += latest_block.total_fees;
+
+        if self.initial_token_supply == 0 {
+            self.initial_token_supply = current_supply;
+        }
+
+        if current_supply != self.initial_token_supply {
+            let latest_block = self.get_latest_block().unwrap();
+            debug!(
+                "diff : {}",
+                self.initial_token_supply as i64 - current_supply as i64
+            );
+            debug!("Current supply is {}", current_supply);
+            debug!("Initial token supply is {}", self.initial_token_supply);
+            debug!(
+                "Social Stake Requirement is {}",
+                self.social_stake_requirement
+            );
+            debug!("Graveyard is {}", latest_block.graveyard);
+            debug!("Treasury is {}", latest_block.treasury);
+            debug!("Unpaid fees is {}", latest_block.previous_block_unpaid);
+            debug!("Total Fees ATR is {}", latest_block.total_fees_atr);
+            debug!("Total Fees New is {}", latest_block.total_fees_new);
+            debug!("Total Fee is {}", latest_block.total_fees);
+            debug!("Amount in utxo {}", amount_in_utxo);
+
+            info!("latest block : {}", latest_block);
+            warn!(
+                "current supply : {:?} doesn't equal to initial supply : {:?}",
+                current_supply, self.initial_token_supply
+            );
+            panic!("cannot continue with invalid total supply");
+        }
     }
 }
 
