@@ -387,6 +387,64 @@ impl Transaction {
     }
 
     //
+    // Builds an ATR rebroadcast transaction for a 3-slip NFT group:
+    // [Bound, Normal, Bound]
+    //
+    pub fn create_rebroadcast_bound_transaction(
+        transaction_to_rebroadcast: &Transaction,
+        slip1: Slip, // first Bound slip
+        slip2: Slip, // Normal slip (amount already includes payout)
+        slip3: Slip, // second Bound slip
+    ) -> Transaction {
+        let mut tx = Transaction::default();
+        tx.transaction_type = TransactionType::ATR;
+
+        // if this is the FIRST time we are rebroadcasting, we copy the
+        // original transaction into the message field in serialized
+        // form. this preserves the original message and its signature
+        // in perpetuity.
+        //
+        // if this is the SECOND or subsequent rebroadcast, we do not
+        // copy the ATR tx (no need for a meta-tx) and rather just update
+        // the message field with the original transaction (which is
+        // by definition already in the previous TX message space.
+        tx.data = if transaction_to_rebroadcast.transaction_type == TransactionType::ATR {
+            transaction_to_rebroadcast.data.clone()
+        } else {
+            transaction_to_rebroadcast.serialize_for_net()
+        };
+
+        // attach the three “input” slips
+        tx.add_from_slip(slip1.clone());
+        tx.add_from_slip(slip2.clone());
+        tx.add_from_slip(slip3.clone());
+
+        //
+        // attach the three output slips
+        // same Bound slips, but payload has slip_type=ATR
+        //
+        tx.add_to_slip(slip1);
+        {
+            let mut output2 = slip2.clone();
+            output2.slip_type = SlipType::ATR;
+            tx.add_to_slip(output2);
+        }
+        tx.add_to_slip(slip2);
+        tx.add_to_slip(slip3);
+
+        tx.generate_total_fees(0, 0);
+
+        //
+        // signature is the ORIGINAL signature. this transaction
+        // will fail its signature check and then get analysed as
+        // a rebroadcast transaction because of its transaction type.
+        //
+        tx.signature = transaction_to_rebroadcast.signature;
+
+        tx
+    }
+
+    //
     // removes utxoset entries when block is deleted
     //
     pub async fn delete(&self, utxoset: &mut UtxoSet) -> bool {
