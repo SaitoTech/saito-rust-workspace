@@ -3644,7 +3644,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn atr_test_2() {
-        // pretty_env_logger::init();
+        pretty_env_logger::init();
         NodeTester::delete_data().await.unwrap();
         let mut tester = NodeTester::default();
 

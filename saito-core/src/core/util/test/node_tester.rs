@@ -26,7 +26,8 @@ pub mod test {
     use crate::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
     use crate::core::stat_thread::StatThread;
     use crate::core::util::configuration::{
-        BlockchainConfig, Configuration, ConsensusConfig, Endpoint, PeerConfig, Server,
+        get_default_issuance_writing_block_interval, BlockchainConfig, Configuration,
+        ConsensusConfig, Endpoint, PeerConfig, Server,
     };
     use crate::core::util::crypto::{generate_keypair_from_private_key, generate_keys};
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
@@ -133,6 +134,7 @@ pub mod test {
                     fork_id: "0000000000000000000000000000000000000000000000000000000000000000"
                         .to_string(),
                     initial_loading_completed: false,
+                    issuance_writing_block_interval: get_default_issuance_writing_block_interval(),
                 },
                 spv_mode: false,
                 browser_mode: false,
