@@ -79,7 +79,7 @@ pub struct ConsensusThread {
     pub generate_genesis_block: bool,
     pub sender_to_router: Sender<RoutingEvent>,
     pub sender_to_miner: Sender<MiningEvent>,
-    pub block_producing_timer: u64,
+    pub block_producing_timer: Timestamp,
     pub timer: Timer,
     pub network: Network,
     pub storage: Storage,
@@ -351,6 +351,22 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
             work_done = true;
         }
+
+        // let config = self.config_lock.read().await;
+        // if config.get_blockchain_configs().issuance_file_write_interval > 0 {
+        //     // generate issuance file periodically
+        //     self.issuance_writing_timer += duration_value;
+
+        //     if self.issuance_writing_timer
+        //         >= config.get_blockchain_configs().issuance_file_write_interval
+        //     {
+        //         let mut mempool = self.mempool_lock.write().await;
+        //         let mut blockchain = self.blockchain_lock.write().await;
+        //         blockchain.write_issuance_file(0, &mut self.storage).await;
+        //         self.issuance_writing_timer = 0;
+        //         work_done = true;
+        //     }
+        // }
 
         if work_done {
             return Some(());

@@ -115,6 +115,7 @@ pub mod test {
                     default_social_stake: 0,
                     default_social_stake_period: 60,
                 },
+                blockchain: BlockchainConfig::default(),
             }));
 
             let issuance_path = TestManager::get_test_issuance_file().unwrap();
@@ -1116,6 +1117,7 @@ pub mod test {
 
     struct TestConfiguration {
         consensus: ConsensusConfig,
+        blockchain: BlockchainConfig,
     }
 
     impl Debug for TestConfiguration {
@@ -1134,7 +1136,7 @@ pub mod test {
         }
 
         fn get_blockchain_configs(&self) -> &BlockchainConfig {
-            todo!()
+            &self.blockchain
         }
 
         fn get_block_fetch_url(&self) -> String {

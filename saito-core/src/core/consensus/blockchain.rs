@@ -20,6 +20,7 @@ use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDA
 use crate::core::defs::{
     BlockHash, BlockId, Currency, ForkId, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey,
     Timestamp, UtxoSet, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR,
+    PROJECT_PUBLIC_KEY,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
@@ -99,6 +100,7 @@ pub struct Blockchain {
 
     pub checkpoint_found: bool,
     pub initial_token_supply: Currency,
+    pub last_issuance_written_on: BlockId,
 }
 
 impl Blockchain {
@@ -132,6 +134,7 @@ impl Blockchain {
             genesis_period,
             checkpoint_found: false,
             initial_token_supply: 0,
+            last_issuance_written_on: 0,
         }
     }
     pub fn init(&mut self) -> Result<(), Error> {
@@ -536,6 +539,15 @@ impl Blockchain {
             {
                 // TODO : this will have an impact when the block sizes are getting large or there are many forks. need to handle this
                 storage.write_block_to_disk(block).await;
+
+                let writing_interval = configs
+                    .get_blockchain_configs()
+                    .issuance_writing_block_interval;
+
+                if writing_interval > 0 && block_id >= self.last_issuance_written_on + writing_interval {
+                    self.write_issuance_file(0, storage).await;
+                    self.last_issuance_written_on = block_id;
+                }
             } else if block.block_type == BlockType::Header {
                 debug!(
                     "block : {:?} not written to disk as type : {:?}",
@@ -568,6 +580,61 @@ impl Blockchain {
             block_type,
             tx_count
         );
+    }
+
+    pub async fn write_issuance_file(&self, threshold: Currency, storage: &mut Storage) {
+        info!("utxo size : {:?}", self.utxoset.len());
+
+        let data = self.get_utxoset_data();
+
+        info!("{:?} entries in utxo to write to file", data.len());
+        let latest_block = self.get_latest_block().unwrap();
+        let issuance_path = format!(
+            "./data/issuance/block_{}_{}_{}.issuance",
+            latest_block.timestamp,
+            latest_block.hash.to_hex(),
+            latest_block.id
+        );
+
+        info!("opening file : {:?}", issuance_path);
+
+        let mut buffer: Vec<u8> = vec![];
+        let slip_type = "Normal";
+        let mut aggregated_value = 0;
+        let mut total_written_lines = 0;
+        for (key, value) in &data {
+            if value < &threshold {
+                aggregated_value += value;
+            } else {
+                total_written_lines += 1;
+                let key_base58 = key.to_base58();
+
+                let s = format!("{}\t{}\t{}\n", value, key_base58, slip_type);
+                let buf = s.as_bytes();
+                buffer.extend(buf);
+            };
+        }
+
+        // add remaining value
+        if aggregated_value > 0 {
+            total_written_lines += 1;
+            let s = format!(
+                "{}\t{}\t{}\n",
+                aggregated_value,
+                PROJECT_PUBLIC_KEY.to_string(),
+                slip_type
+            );
+            let buf = s.as_bytes();
+            buffer.extend(buf);
+        }
+
+        storage
+            .io_interface
+            .write_value(issuance_path.as_str(), buffer.as_slice())
+            .await
+            .expect("issuance file should be written");
+
+        info!("total written lines : {:?}", total_written_lines);
     }
 
     fn remove_block_transactions(&self, block_hash: &SaitoHash, mempool: &mut Mempool) {

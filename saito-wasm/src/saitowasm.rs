@@ -159,7 +159,6 @@ pub fn new(
             generate_genesis_block: false,
             sender_to_router: sender_to_blockchain.clone(),
             sender_to_miner: sender_to_miner.clone(),
-            // sender_global: (),
             block_producing_timer: 0,
             timer: timer.clone(),
             network: Network::new(
@@ -1135,56 +1134,57 @@ pub async fn write_issuance_file(threshold: Currency) {
         .routing_thread
         .blockchain_lock
         .clone();
-    let storage = &mut saito.as_mut().unwrap().consensus_thread.storage;
-    let _list = storage.load_block_name_list().await.unwrap();
+    let mut storage = &mut saito.as_mut().unwrap().consensus_thread.storage;
+    // let _list = storage.load_block_name_list().await.unwrap();
 
     let blockchain = blockchain_lock.write().await;
+    blockchain.write_issuance_file(threshold, &mut storage).await;
 
-    info!("utxo size : {:?}", blockchain.utxoset.len());
+    // info!("utxo size : {:?}", blockchain.utxoset.len());
 
-    let data = blockchain.get_utxoset_data();
+    // let data = blockchain.get_utxoset_data();
 
-    info!("{:?} entries in utxo to write to file", data.len());
-    let issuance_path: String = "./data/issuance.file".to_string();
-    info!("opening file : {:?}", issuance_path);
+    // info!("{:?} entries in utxo to write to file", data.len());
+    // let issuance_path: String = "./data/issuance.file".to_string();
+    // info!("opening file : {:?}", issuance_path);
 
-    let mut buffer: Vec<u8> = vec![];
-    let slip_type = "Normal";
-    let mut aggregated_value = 0;
-    let mut total_written_lines = 0;
-    for (key, value) in &data {
-        if value < &threshold {
-            aggregated_value += value;
-        } else {
-            total_written_lines += 1;
-            let key_base58 = key.to_base58();
+    // let mut buffer: Vec<u8> = vec![];
+    // let slip_type = "Normal";
+    // let mut aggregated_value = 0;
+    // let mut total_written_lines = 0;
+    // for (key, value) in &data {
+    //     if value < &threshold {
+    //         aggregated_value += value;
+    //     } else {
+    //         total_written_lines += 1;
+    //         let key_base58 = key.to_base58();
 
-            let s = format!("{}\t{}\t{}\n", value, key_base58, slip_type);
-            let buf = s.as_bytes();
-            buffer.extend(buf);
-        };
-    }
+    //         let s = format!("{}\t{}\t{}\n", value, key_base58, slip_type);
+    //         let buf = s.as_bytes();
+    //         buffer.extend(buf);
+    //     };
+    // }
 
-    // add remaining value
-    if aggregated_value > 0 {
-        total_written_lines += 1;
-        let s = format!(
-            "{}\t{}\t{}\n",
-            aggregated_value,
-            PROJECT_PUBLIC_KEY.to_string(),
-            slip_type
-        );
-        let buf = s.as_bytes();
-        buffer.extend(buf);
-    }
+    // // add remaining value
+    // if aggregated_value > 0 {
+    //     total_written_lines += 1;
+    //     let s = format!(
+    //         "{}\t{}\t{}\n",
+    //         aggregated_value,
+    //         PROJECT_PUBLIC_KEY.to_string(),
+    //         slip_type
+    //     );
+    //     let buf = s.as_bytes();
+    //     buffer.extend(buf);
+    // }
 
-    storage
-        .io_interface
-        .write_value(issuance_path.as_str(), buffer.as_slice())
-        .await
-        .expect("issuance file should be written");
+    // storage
+    //     .io_interface
+    //     .write_value(issuance_path.as_str(), buffer.as_slice())
+    //     .await
+    //     .expect("issuance file should be written");
 
-    info!("total written lines : {:?}", total_written_lines);
+    // info!("total written lines : {:?}", total_written_lines);
 }
 
 #[wasm_bindgen]
