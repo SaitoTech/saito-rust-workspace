@@ -951,7 +951,6 @@ impl Transaction {
         blockchain: &Blockchain,
         validate_against_utxo: bool,
     ) -> bool {
-
         //
         // there are various types of transactions which have different validation
         // requirements. the most significant difference is between transactions that
