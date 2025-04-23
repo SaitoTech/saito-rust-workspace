@@ -2,7 +2,8 @@ use figment::providers::{Format, Json};
 use figment::Figment;
 use log::{debug, error, info};
 use saito_core::core::util::configuration::{
-    get_default_issuance_writing_block_interval, BlockchainConfig, Configuration, ConsensusConfig, Endpoint, PeerConfig, Server
+    get_default_issuance_writing_block_interval, BlockchainConfig, Configuration, ConsensusConfig,
+    Endpoint, PeerConfig, Server,
 };
 use serde::{Deserialize, Serialize};
 use std::io::{Error, ErrorKind};

@@ -6,7 +6,8 @@ use serde::Deserialize;
 
 use log::{debug, error};
 use saito_core::core::util::configuration::{
-    get_default_issuance_writing_block_interval, BlockchainConfig, Configuration, ConsensusConfig, Endpoint, PeerConfig, Server
+    get_default_issuance_writing_block_interval, BlockchainConfig, Configuration, ConsensusConfig,
+    Endpoint, PeerConfig, Server,
 };
 
 #[derive(Deserialize, Debug, Clone)]

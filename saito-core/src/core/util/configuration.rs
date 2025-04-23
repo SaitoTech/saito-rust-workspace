@@ -72,9 +72,6 @@ pub struct Server {
     pub reconnection_wait_time: Timestamp,
 }
 
-
-
-
 #[derive(Deserialize, Debug, Clone, Serialize, Default)]
 pub struct BlockchainConfig {
     #[serde(default)]
@@ -97,7 +94,7 @@ pub struct BlockchainConfig {
     pub fork_id: String,
     #[serde(skip)]
     pub initial_loading_completed: bool,
-    #[serde(default="get_default_issuance_writing_block_interval")]
+    #[serde(default = "get_default_issuance_writing_block_interval")]
     pub issuance_writing_block_interval: BlockId,
 }
 

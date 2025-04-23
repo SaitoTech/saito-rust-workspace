@@ -1138,7 +1138,9 @@ pub async fn write_issuance_file(threshold: Currency) {
     // let _list = storage.load_block_name_list().await.unwrap();
 
     let blockchain = blockchain_lock.write().await;
-    blockchain.write_issuance_file(threshold, &mut storage).await;
+    blockchain
+        .write_issuance_file(threshold, &mut storage)
+        .await;
 
     // info!("utxo size : {:?}", blockchain.utxoset.len());
 

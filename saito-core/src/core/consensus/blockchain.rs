@@ -544,7 +544,9 @@ impl Blockchain {
                     .get_blockchain_configs()
                     .issuance_writing_block_interval;
 
-                if writing_interval > 0 && block_id >= self.last_issuance_written_on + writing_interval {
+                if writing_interval > 0
+                    && block_id >= self.last_issuance_written_on + writing_interval
+                {
                     self.write_issuance_file(0, storage).await;
                     self.last_issuance_written_on = block_id;
                 }
