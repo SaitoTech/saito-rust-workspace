@@ -136,7 +136,11 @@ impl ConsensusThread {
                 .await;
             info!("added issuance init tx for : {:?}", tx.signature.to_hex());
         }
-        assert_eq!(mempool.transactions.len(), slip_count, "mempool txs count should be equal to issuance slips count");
+        assert_eq!(
+            mempool.transactions.len(),
+            slip_count,
+            "mempool txs count should be equal to issuance slips count"
+        );
     }
     pub async fn produce_block(
         &mut self,
