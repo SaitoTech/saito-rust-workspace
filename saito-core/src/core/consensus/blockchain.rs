@@ -546,6 +546,7 @@ impl Blockchain {
                 if writing_interval > 0
                     && block_id >= self.last_issuance_written_on + writing_interval
                 {
+                    debug!("writing interval : {:?} last issuance written on : {:?}, writing for current block : {}", writing_interval, self.last_issuance_written_on, block_id);
                     self.write_issuance_file(0, storage).await;
                     self.last_issuance_written_on = block_id;
                 }
@@ -2189,25 +2190,25 @@ impl Blockchain {
 
         if current_supply != self.initial_token_supply {
             let latest_block = self.get_latest_block().unwrap();
-            debug!(
+            warn!(
                 "diff : {}",
                 self.initial_token_supply as i64 - current_supply as i64
             );
-            debug!("Current supply is {}", current_supply);
-            debug!("Initial token supply is {}", self.initial_token_supply);
-            debug!(
+            warn!("Current supply is {}", current_supply);
+            warn!("Initial token supply is {}", self.initial_token_supply);
+            warn!(
                 "Social Stake Requirement is {}",
                 self.social_stake_requirement
             );
-            debug!("Graveyard is {}", latest_block.graveyard);
-            debug!("Treasury is {}", latest_block.treasury);
-            debug!("Unpaid fees is {}", latest_block.previous_block_unpaid);
-            debug!("Total Fees ATR is {}", latest_block.total_fees_atr);
-            debug!("Total Fees New is {}", latest_block.total_fees_new);
-            debug!("Total Fee is {}", latest_block.total_fees);
-            debug!("Amount in utxo {}", amount_in_utxo);
+            warn!("Graveyard is {}", latest_block.graveyard);
+            warn!("Treasury is {}", latest_block.treasury);
+            warn!("Unpaid fees is {}", latest_block.previous_block_unpaid);
+            warn!("Total Fees ATR is {}", latest_block.total_fees_atr);
+            warn!("Total Fees New is {}", latest_block.total_fees_new);
+            warn!("Total Fee is {}", latest_block.total_fees);
+            warn!("Amount in utxo {}", amount_in_utxo);
 
-            info!("latest block : {}", latest_block);
+            warn!("latest block : {}", latest_block);
             warn!(
                 "current supply : {:?} doesn't equal to initial supply : {:?}",
                 current_supply, self.initial_token_supply

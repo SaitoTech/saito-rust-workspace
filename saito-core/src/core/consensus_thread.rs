@@ -108,6 +108,7 @@ impl ConsensusThread {
         }
         let mut txs: Vec<Transaction> = vec![];
         let mut initial_token_supply = 0;
+        let slip_count = slips.len();
         for slip in slips {
             debug!("{:?} slip public key", slip.public_key.to_base58());
             initial_token_supply += slip.amount;
@@ -117,9 +118,16 @@ impl ConsensusThread {
             txs.push(tx);
         }
 
+        assert_eq!(
+            slip_count,
+            txs.len(),
+            "issuanace slips and txs counts should be equal"
+        );
+
         let mut blockchain = blockchain_lock.write().await;
         // setting the initial token supply to the blockchain here if we are generating the genesis block
         blockchain.initial_token_supply = initial_token_supply;
+        info!("initial token supply : {:?} set", initial_token_supply);
         let mut mempool = mempool_lock.write().await;
 
         for tx in txs {
@@ -128,6 +136,7 @@ impl ConsensusThread {
                 .await;
             info!("added issuance init tx for : {:?}", tx.signature.to_hex());
         }
+        assert_eq!(mempool.transactions.len(), slip_count, "mempool txs count should be equal to issuance slips count");
     }
     pub async fn produce_block(
         &mut self,

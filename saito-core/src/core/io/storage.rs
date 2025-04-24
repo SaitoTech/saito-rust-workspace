@@ -204,7 +204,7 @@ impl Storage {
                     tokens_issued += v[i].amount;
                 }
 
-                debug!("{:?} tokens issued", tokens_issued);
+                info!("{:?} tokens issued", tokens_issued);
                 return v;
             }
         } else {
@@ -223,7 +223,7 @@ impl Storage {
 
     /// convert an issuance expression to slip
     fn convert_issuance_into_slip(&self, line: &str) -> Option<Slip> {
-        let entries: Vec<&str> = line.split('\t').collect();
+        let entries: Vec<&str> = line.split_whitespace().collect();
 
         let result = entries[0].parse::<u64>();
 
