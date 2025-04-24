@@ -697,7 +697,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 mod tests {
     use log::info;
 
-    use crate::core::consensus::block::{Block, BlockType};
+    use crate::core::consensus::block::Block;
     use crate::core::consensus::slip::SlipType;
     use crate::core::defs::{PrintForLog, SaitoHash, NOLAN_PER_SAITO, UTXO_KEY_LENGTH};
 
