@@ -2160,7 +2160,7 @@ impl Blockchain {
             .filter(|(_, value)| **value)
             .map(|(key, value)| {
                 let slip = Slip::parse_slip_from_utxokey(key).unwrap();
-                info!(
+                trace!(
                     "Utxo : {:?} : {} : {:?}, block : {}-{}-{}, valid : {}",
                     slip.public_key.to_base58(),
                     slip.amount,
@@ -2215,6 +2215,10 @@ impl Blockchain {
             );
             panic!("cannot continue with invalid total supply");
         }
+        debug!(
+            "total supply check passed. current supply : {:?} initial supply : {:?}",
+            current_supply, self.initial_token_supply
+        );
     }
 }
 
