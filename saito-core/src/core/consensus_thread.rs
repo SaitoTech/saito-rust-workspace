@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, info, trace, warn};
+use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -11,11 +11,10 @@ use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::mempool::Mempool;
-use crate::core::consensus::slip::Slip;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER, STAT_BIN_COUNT,
+    PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER, STAT_BIN_COUNT,
 };
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
@@ -109,6 +108,7 @@ impl ConsensusThread {
         }
         let mut txs: Vec<Transaction> = vec![];
         let mut initial_token_supply = 0;
+        let slip_count = slips.len();
         for slip in slips {
             debug!("{:?} slip public key", slip.public_key.to_base58());
             initial_token_supply += slip.amount;
@@ -118,9 +118,16 @@ impl ConsensusThread {
             txs.push(tx);
         }
 
+        assert_eq!(
+            slip_count,
+            txs.len(),
+            "issuanace slips and txs counts should be equal"
+        );
+
         let mut blockchain = blockchain_lock.write().await;
         // setting the initial token supply to the blockchain here if we are generating the genesis block
         blockchain.initial_token_supply = initial_token_supply;
+        info!("initial token supply : {:?} set", initial_token_supply);
         let mut mempool = mempool_lock.write().await;
 
         for tx in txs {
@@ -129,6 +136,11 @@ impl ConsensusThread {
                 .await;
             info!("added issuance init tx for : {:?}", tx.signature.to_hex());
         }
+        assert_eq!(
+            mempool.transactions.len(),
+            slip_count,
+            "mempool txs count should be equal to issuance slips count"
+        );
     }
     pub async fn produce_block(
         &mut self,
@@ -685,7 +697,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 mod tests {
     use log::info;
 
-    use crate::core::consensus::block::{Block, BlockType};
+    use crate::core::consensus::block::Block;
     use crate::core::consensus::slip::SlipType;
     use crate::core::defs::{PrintForLog, SaitoHash, NOLAN_PER_SAITO, UTXO_KEY_LENGTH};
 

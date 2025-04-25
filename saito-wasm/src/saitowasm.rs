@@ -27,7 +27,7 @@ use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
     BlockId, Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
-    Timestamp, CHANNEL_SAFE_BUFFER, PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
+    Timestamp, CHANNEL_SAFE_BUFFER, STAT_BIN_COUNT,
 };
 use saito_core::core::io::network::{Network, PeerDisconnectType};
 use saito_core::core::io::network_event::NetworkEvent;
