@@ -344,6 +344,8 @@ impl Wallet {
                                 wallet_changed |= WALLET_UPDATED;
                             }
                         }
+
+                        i += 1;
                     }
                 }
 
@@ -962,7 +964,6 @@ impl Wallet {
         //
         // ...and return
         //
-        info!("final transaction: {:?}", transaction);
         Ok(transaction)
     }
 
@@ -1035,7 +1036,6 @@ impl Wallet {
         transaction.sign(&self.private_key);
         let tx_sig = transaction.signature.clone();
 
-        info!("NFT transfer transaction created: {:?}", transaction);
         Ok(transaction)
     }
 
