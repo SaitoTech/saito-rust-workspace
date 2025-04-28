@@ -2185,6 +2185,7 @@ impl Blockchain {
         current_supply += latest_block.total_fees;
 
         if self.initial_token_supply == 0 {
+            info!("initial token supply is not set. setting it to current supply : {}", current_supply);
             self.initial_token_supply = current_supply;
         }
 
