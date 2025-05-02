@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use js_sys::{Array, JsString};
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use num_traits::FromPrimitive;
 use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -116,7 +116,7 @@ impl WasmWallet {
     pub async fn get_slips(&self) -> js_sys::Array {
         let wallet = self.wallet.read().await;
         let slips = &wallet.slips;
-        info!("get slips. count : {:?}", slips.len());
+        debug!("get slips. count : {:?}", slips.len());
 
         let array = js_sys::Array::new_with_length(slips.len() as u32);
 

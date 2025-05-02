@@ -141,7 +141,7 @@ impl Transaction {
         my_public_key: &SaitoPublicKey,
         to_public_key: &SaitoPublicKey,
     ) {
-        assert_ne!(my_public_key, to_public_key);
+        assert_ne!(my_public_key, to_public_key, "cannot add hop to self");
         let hop = Hop::generate(my_private_key, my_public_key, to_public_key, self);
         self.path.push(hop);
     }

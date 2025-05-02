@@ -547,7 +547,7 @@ impl Blockchain {
                     && block_id >= self.last_issuance_written_on + writing_interval
                 {
                     debug!("writing interval : {:?} last issuance written on : {:?}, writing for current block : {}", writing_interval, self.last_issuance_written_on, block_id);
-                    self.write_issuance_file(0, storage).await;
+                    self.write_issuance_file(0, "", storage).await;
                     self.last_issuance_written_on = block_id;
                 }
             } else if block.block_type == BlockType::Header {
@@ -584,19 +584,30 @@ impl Blockchain {
         );
     }
 
-    pub async fn write_issuance_file(&self, threshold: Currency, storage: &mut Storage) {
+    pub async fn write_issuance_file(
+        &self,
+        threshold: Currency,
+        issuance_file_path: &str,
+        storage: &mut Storage,
+    ) {
         info!("utxo size : {:?}", self.utxoset.len());
 
         let data = self.get_utxoset_data();
 
         info!("{:?} entries in utxo to write to file", data.len());
         let latest_block = self.get_latest_block().unwrap();
-        let issuance_path = format!(
-            "./data/issuance/block_{}_{}_{}.issuance",
-            latest_block.timestamp,
-            latest_block.hash.to_hex(),
-            latest_block.id
-        );
+        let issuance_path: String;
+
+        if issuance_file_path.is_empty() {
+            issuance_path = format!(
+                "./data/issuance/block_{}_{}_{}.issuance",
+                latest_block.timestamp,
+                latest_block.hash.to_hex(),
+                latest_block.id
+            );
+        } else {
+            issuance_path = issuance_file_path.to_string();
+        }
 
         info!("opening file : {:?}", issuance_path);
 
@@ -2144,22 +2155,34 @@ impl Blockchain {
         current_supply
     }
     pub async fn check_total_supply(&mut self, configs: &(dyn Configuration + Send + Sync)) {
-        if !self.has_total_supply_loaded(configs.get_consensus_config().unwrap().genesis_period) {
+        let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+
+        if !self.has_total_supply_loaded(genesis_period) {
             debug!("total supply not loaded yet. skipping check");
             return;
         }
+
         if configs.is_browser() || configs.is_spv_mode() {
             debug!("skipping total supply check in spv mode");
             return;
         }
 
+        let latest_block = self
+            .get_latest_block()
+            .expect("There should be a latest block in blockchain");
+
         let mut current_supply = 0;
         let amount_in_utxo = self
             .utxoset
             .iter()
-            .filter(|(_, value)| **value)
-            .map(|(key, value)| {
-                let slip = Slip::parse_slip_from_utxokey(key).unwrap();
+            .filter(|(_, &spent)| spent)
+            .filter_map(|(key, &spent)| {
+                let slip = Slip::parse_slip_from_utxokey(key).ok()?;
+
+                if slip.block_id < latest_block.id.saturating_sub(genesis_period) {
+                    return None;
+                }
+
                 trace!(
                     "Utxo : {:?} : {} : {:?}, block : {}-{}-{}, valid : {}",
                     slip.public_key.to_base58(),
@@ -2168,23 +2191,25 @@ impl Blockchain {
                     slip.block_id,
                     slip.tx_ordinal,
                     slip.slip_index,
-                    value
+                    spent
                 );
-                slip.amount
+
+                Some(slip.amount)
             })
             .sum::<Currency>();
 
         current_supply += amount_in_utxo;
 
-        let latest_block = self
-            .get_latest_block()
-            .expect("There should be a latest block in blockchain");
         current_supply += latest_block.graveyard;
         current_supply += latest_block.treasury;
         current_supply += latest_block.previous_block_unpaid;
         current_supply += latest_block.total_fees;
 
         if self.initial_token_supply == 0 {
+            info!(
+                "initial token supply is not set. setting it to current supply : {}",
+                current_supply
+            );
             self.initial_token_supply = current_supply;
         }
 
