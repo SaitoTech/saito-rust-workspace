@@ -20,10 +20,10 @@ impl WasmHop {
     }
     #[wasm_bindgen(getter)]
     pub fn sig(&self) -> String {
-        self.hop.to.to_base58()
+        self.hop.sig.to_base58()
     }
     #[wasm_bindgen(getter)]
     pub fn to(&self) -> String {
-        self.hop.sig.to_base58()
+        self.hop.to.to_base58()
     }
 }

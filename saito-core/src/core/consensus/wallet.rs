@@ -615,7 +615,7 @@ impl Wallet {
 
         let mut should_break_slips = false;
         if collected_amount < staking_amount {
-            debug!("not enough funds in staking slips. searching in normal slips. current_balance : {:?}",self.available_balance);
+            debug!("not enough funds in staking slips. searching in normal slips. current_balance : {:?}", self.available_balance);
             let required_from_unspent_slips = staking_amount - collected_amount;
             let mut collected_from_unspent_slips: Currency = 0;
             let mut unspent_slips_to_remove = vec![];
