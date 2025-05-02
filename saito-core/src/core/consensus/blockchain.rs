@@ -547,7 +547,7 @@ impl Blockchain {
                     && block_id >= self.last_issuance_written_on + writing_interval
                 {
                     debug!("writing interval : {:?} last issuance written on : {:?}, writing for current block : {}", writing_interval, self.last_issuance_written_on, block_id);
-                    self.write_issuance_file(0, storage).await;
+                    self.write_issuance_file(0, "", storage).await;
                     self.last_issuance_written_on = block_id;
                 }
             } else if block.block_type == BlockType::Header {
@@ -584,19 +584,30 @@ impl Blockchain {
         );
     }
 
-    pub async fn write_issuance_file(&self, threshold: Currency, storage: &mut Storage) {
+    pub async fn write_issuance_file(
+        &self,
+        threshold: Currency,
+        issuance_file_path: &str,
+        storage: &mut Storage,
+    ) {
         info!("utxo size : {:?}", self.utxoset.len());
 
         let data = self.get_utxoset_data();
 
         info!("{:?} entries in utxo to write to file", data.len());
         let latest_block = self.get_latest_block().unwrap();
-        let issuance_path = format!(
-            "./data/issuance/block_{}_{}_{}.issuance",
-            latest_block.timestamp,
-            latest_block.hash.to_hex(),
-            latest_block.id
-        );
+        let issuance_path: String;
+
+        if issuance_file_path.is_empty() {
+            issuance_path = format!(
+                "./data/issuance/block_{}_{}_{}.issuance",
+                latest_block.timestamp,
+                latest_block.hash.to_hex(),
+                latest_block.id
+            );
+        } else {
+            issuance_path = issuance_file_path.to_string();
+        }
 
         info!("opening file : {:?}", issuance_path);
 
