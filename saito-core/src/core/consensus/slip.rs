@@ -78,12 +78,9 @@ impl Slip {
     pub fn delete(&self, utxoset: &mut UtxoSet) -> bool {
         if self.get_utxoset_key() == [0; UTXO_KEY_LENGTH] {
             error!("ERROR 572034: asked to remove a slip without its utxoset_key properly set!");
-            false;
+            return false;
         }
-        debug!(
-            "deleting slip from utxo : {:?}-{:?}-{:?} with value : {:?}",
-            self.block_id, self.tx_ordinal, self.slip_index, self.amount
-        );
+        debug!("deleting slip from utxo : {}", self);
         utxoset.remove_entry(&self.get_utxoset_key());
         true
     }
