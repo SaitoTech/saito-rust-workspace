@@ -2144,22 +2144,34 @@ impl Blockchain {
         current_supply
     }
     pub async fn check_total_supply(&mut self, configs: &(dyn Configuration + Send + Sync)) {
-        if !self.has_total_supply_loaded(configs.get_consensus_config().unwrap().genesis_period) {
+        let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+
+        if !self.has_total_supply_loaded(genesis_period) {
             debug!("total supply not loaded yet. skipping check");
             return;
         }
+
         if configs.is_browser() || configs.is_spv_mode() {
             debug!("skipping total supply check in spv mode");
             return;
         }
 
+        let latest_block = self
+            .get_latest_block()
+            .expect("There should be a latest block in blockchain");
+
         let mut current_supply = 0;
         let amount_in_utxo = self
             .utxoset
             .iter()
-            .filter(|(_, value)| **value)
-            .map(|(key, value)| {
-                let slip = Slip::parse_slip_from_utxokey(key).unwrap();
+            .filter(|(_, &spent)| spent)
+            .filter_map(|(key, &spent)| {
+                let slip = Slip::parse_slip_from_utxokey(key).ok()?;
+
+                if slip.block_id < latest_block.id.saturating_sub(genesis_period) {
+                    return None;
+                }
+
                 trace!(
                     "Utxo : {:?} : {} : {:?}, block : {}-{}-{}, valid : {}",
                     slip.public_key.to_base58(),
@@ -2168,17 +2180,15 @@ impl Blockchain {
                     slip.block_id,
                     slip.tx_ordinal,
                     slip.slip_index,
-                    value
+                    spent
                 );
-                slip.amount
+
+                Some(slip.amount)
             })
             .sum::<Currency>();
 
         current_supply += amount_in_utxo;
 
-        let latest_block = self
-            .get_latest_block()
-            .expect("There should be a latest block in blockchain");
         current_supply += latest_block.graveyard;
         current_supply += latest_block.treasury;
         current_supply += latest_block.previous_block_unpaid;
