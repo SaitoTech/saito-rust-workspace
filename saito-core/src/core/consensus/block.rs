@@ -3045,6 +3045,61 @@ impl Block {
 
         timestamp.to_string() + "-" + block_hash.to_hex().as_str() + BLOCK_FILE_EXTENSION
     }
+    pub fn print_all(&self) {
+        info!(
+            "Block {{ id: {}, timestamp: {}, previous_block_hash: {:?}, creator: {:?}, merkle_root: {:?}, signature: {:?}, graveyard: {}, treasury: {}, total_fees: {}, total_fees_new: {}, total_fees_atr: {}, avg_total_fees: {}, avg_total_fees_new: {}, avg_total_fees_atr: {}, total_payout_routing: {}, total_payout_mining: {}, total_payout_treasury: {}, total_payout_graveyard: {}, total_payout_atr: {}, avg_payout_routing: {}, avg_payout_mining: {}, avg_payout_treasury: {}, avg_payout_graveyard: {}, avg_payout_atr: {}, avg_fee_per_byte: {}, fee_per_byte: {}, avg_nolan_rebroadcast_per_block: {}, burnfee: {}, difficulty: {}, previous_block_unpaid: {}, hash: {:?}, total_work: {}, in_longest_chain: {}, has_golden_ticket: {}, has_issuance_transaction: {}, issuance_transaction_index: {}, has_fee_transaction: {}, has_staking_transaction: {}, golden_ticket_index: {}, fee_transaction_index: {}, total_rebroadcast_slips: {}, total_rebroadcast_nolan: {}, rebroadcast_hash: {}, block_type: {:?}, cv: {}, routed_from_peer: {:?} ",
+            self.id,
+            self.timestamp,
+            self.previous_block_hash.to_hex(),
+            self.creator.to_base58(),
+            self.merkle_root.to_hex(),
+            self.signature.to_hex(),
+            self.graveyard,
+            self.treasury,
+            self.total_fees,
+            self.total_fees_new,
+            self.total_fees_atr,
+            self.avg_total_fees,
+            self.avg_total_fees_new,
+            self.avg_total_fees_atr,
+            self.total_payout_routing,
+            self.total_payout_mining,
+            self.total_payout_treasury,
+            self.total_payout_graveyard,
+            self.total_payout_atr,
+            self.avg_payout_routing,
+            self.avg_payout_mining,
+            self.avg_payout_treasury,
+            self.avg_payout_graveyard,
+            self.avg_payout_atr,
+            self.avg_fee_per_byte,
+            self.fee_per_byte,
+            self.avg_nolan_rebroadcast_per_block,
+            self.burnfee,
+            self.difficulty,
+            self.previous_block_unpaid,
+            self.hash.to_hex(),
+            self.total_work,
+            self.in_longest_chain,
+            self.has_golden_ticket,
+            self.has_issuance_transaction,
+            self.issuance_transaction_index,
+            self.has_fee_transaction,
+            self.has_staking_transaction,
+            self.golden_ticket_index,
+            self.fee_transaction_index,
+            self.total_rebroadcast_slips,
+            self.total_rebroadcast_nolan,
+            self.rebroadcast_hash.to_hex(),
+            self.block_type,
+            self.cv,
+            self.routed_from_peer,
+        );
+        info!(" transactions : ");
+        for (index, tx) in self.transactions.iter().enumerate() {
+            info!("tx {} : {}", index, tx);
+        }
+    }
 }
 
 #[cfg(test)]
