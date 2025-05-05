@@ -2238,6 +2238,7 @@ impl Blockchain {
                 "current supply : {:?} doesn't equal to initial supply : {:?}",
                 current_supply, self.initial_token_supply
             );
+            latest_block.print_all();
             panic!("cannot continue with invalid total supply");
         }
         debug!(
