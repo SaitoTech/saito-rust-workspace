@@ -229,7 +229,8 @@ impl Mempool {
                 .create_staking_transaction(
                     blockchain.social_stake_requirement,
                     blockchain.get_latest_unlocked_stake_block_id(),
-                    (blockchain.get_latest_block_id() + 1).saturating_sub(configs.get_consensus_config().unwrap().genesis_period),
+                    (blockchain.get_latest_block_id() + 1)
+                        .saturating_sub(configs.get_consensus_config().unwrap().genesis_period),
                 )
                 .ok()?;
         }
