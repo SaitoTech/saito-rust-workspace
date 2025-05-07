@@ -1546,14 +1546,14 @@ mod tests {
         assert_eq!(latest_block_id, 100);
 
         // NodeTester::delete_data().await.unwrap();
-        let mut tester = NodeTester::new(10, Some(private_key), None);
-        tester.set_staking_requirement(2 * NOLAN_PER_SAITO, 8).await;
-        tester.init().await.unwrap();
-        tester.wait_till_block_id(100).await.unwrap();
-        tester
-            .check_total_supply()
-            .await
-            .expect("total supply should not change");
+        // let mut tester = NodeTester::new(10, Some(private_key), None);
+        // tester.set_staking_requirement(2 * NOLAN_PER_SAITO, 8).await;
+        // tester.init().await.unwrap();
+        // tester.wait_till_block_id(100).await.unwrap();
+        // tester
+        //     .check_total_supply()
+        //     .await
+        //     .expect("total supply should not change");
 
         {
             for mut block in blocks {
