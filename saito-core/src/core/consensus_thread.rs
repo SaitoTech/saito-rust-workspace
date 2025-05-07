@@ -699,9 +699,11 @@ mod tests {
 
     use crate::core::consensus::block::Block;
     use crate::core::consensus::slip::SlipType;
+    use crate::core::consensus_thread::ConsensusEvent;
     use crate::core::defs::{PrintForLog, SaitoHash, NOLAN_PER_SAITO, UTXO_KEY_LENGTH};
 
     use crate::core::process::keep_time::KeepTime;
+    use crate::core::process::process_event::ProcessEvent;
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::node_tester::test::{NodeTester, TestTimeKeeper};
     use std::fs;
@@ -1480,5 +1482,106 @@ mod tests {
                 file_count
             );
         }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn receiving_old_blocks_again_test() {
+        pretty_env_logger::init();
+        NodeTester::delete_data().await.unwrap();
+        let mut tester = NodeTester::new(10, None, None);
+        let public_key = tester.get_public_key().await;
+        let private_key = tester.get_private_key().await;
+        tester.set_staking_requirement(2 * NOLAN_PER_SAITO, 8).await;
+        let issuance = vec![
+            (public_key.to_base58(), 8 * 2 * NOLAN_PER_SAITO),
+            (public_key.to_base58(), 100 * NOLAN_PER_SAITO),
+            (
+                "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(),
+                50 * NOLAN_PER_SAITO,
+            ),
+        ];
+        tester.set_issuance(issuance).await.unwrap();
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(1).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let mut blocks = vec![];
+        // create a main fork first
+        for i in 2..=100 {
+            let tx = tester
+                .create_transaction(NOLAN_PER_SAITO, NOLAN_PER_SAITO, public_key)
+                .await
+                .unwrap();
+
+            tester.add_transaction(tx).await;
+            tester.wait_till_block_id(i).await.unwrap();
+
+            if i >= 30 && i < 50 {
+                let block = tester
+                    .consensus_thread
+                    .blockchain_lock
+                    .read()
+                    .await
+                    .get_latest_block()
+                    .cloned();
+                blocks.push(block.clone().unwrap());
+            }
+            tester
+                .check_total_supply()
+                .await
+                .expect("total supply should not change");
+        }
+
+        assert_eq!(blocks.len(), 20, "blocks length should be 20");
+        let latest_block_id = tester
+            .consensus_thread
+            .blockchain_lock
+            .read()
+            .await
+            .get_latest_block_id();
+        assert_eq!(latest_block_id, 100);
+
+        // NodeTester::delete_data().await.unwrap();
+        let mut tester = NodeTester::new(10, Some(private_key), None);
+        tester.set_staking_requirement(2 * NOLAN_PER_SAITO, 8).await;
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(100).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        {
+            for mut block in blocks {
+                block.in_longest_chain = false;
+                block.transaction_map.clear();
+                block.created_hashmap_of_slips_spent_this_block = false;
+                block.safe_to_prune_transactions = false;
+
+                tester
+                    .consensus_thread
+                    .process_event(ConsensusEvent::BlockFetched {
+                        block: block,
+                        peer_index: 0,
+                    })
+                    .await;
+            }
+        }
+
+        let latest_block_id_new = tester
+            .consensus_thread
+            .blockchain_lock
+            .read()
+            .await
+            .get_latest_block_id();
+        assert_eq!(latest_block_id_new, 100);
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
     }
 }

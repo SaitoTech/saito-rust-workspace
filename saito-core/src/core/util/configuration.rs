@@ -20,7 +20,11 @@ pub struct Endpoint {
     pub protocol: String,
 }
 fn get_default_genesis_period() -> Timestamp {
-    100_000
+    #[cfg(test)]
+    return 10;
+
+    #[cfg(not(test))]
+    return 100_000;
 }
 fn get_default_heartbeat_period_ms() -> Timestamp {
     5_000
@@ -44,10 +48,10 @@ fn get_default_stat_timer() -> Timestamp {
     5_000
 }
 fn get_default_social_stake() -> Timestamp {
-    0
+    return 0;
 }
 fn get_default_social_stake_period() -> Timestamp {
-    60
+    return 60;
 }
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Server {
@@ -121,12 +125,12 @@ pub struct ConsensusConfig {
 impl Default for ConsensusConfig {
     fn default() -> Self {
         ConsensusConfig {
-            genesis_period: 100_000,
-            heartbeat_interval: 5_000,
+            genesis_period: get_default_genesis_period(),
+            heartbeat_interval: get_default_heartbeat_period_ms(),
             prune_after_blocks: 8,
             max_staker_recursions: 3,
-            default_social_stake: 0,
-            default_social_stake_period: 60,
+            default_social_stake: get_default_social_stake(),
+            default_social_stake_period: get_default_social_stake_period(),
         }
     }
 }
