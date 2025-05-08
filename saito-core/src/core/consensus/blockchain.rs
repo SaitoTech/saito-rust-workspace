@@ -2071,6 +2071,11 @@ impl Blockchain {
         let latest_block_id = self.get_latest_block_id();
         let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
 
+        debug!(
+            "latest_block_id at get_balance_snapshot: {:?}",
+            latest_block_id
+        );
+
         let mut snapshot = BalanceSnapshot {
             latest_block_id: latest_block_id,
             latest_block_hash: self.get_latest_block_hash(),
