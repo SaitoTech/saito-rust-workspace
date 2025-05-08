@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 
 use crate::core::consensus::blockchain::Blockchain;
-use log::{debug, error, trace, warn};
+use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use primitive_types::U256;
@@ -1191,15 +1191,15 @@ impl Transaction {
             // our validation rules are slightly different depending on which case
             // we have, so we check first to see which is which.
             //
-            let mut is_this_a_new_nft = true;
-            if self
-                .from
-                .iter()
-                .any(|slip| slip.slip_type == SlipType::Bound)
-                || self.to.iter().any(|slip| slip.slip_type == SlipType::Bound)
-            {
-                is_this_a_new_nft = false;
-            }
+
+            info!("self tx: {:?}", self);
+
+            //
+            // classify as “new NFT” if exactly 1 Normal input and ≥3 outputs
+            //
+            let is_this_a_new_nft = self.from.len() == 1
+                && self.from[0].slip_type == SlipType::Normal
+                && self.to.len() >= 3;
 
             //
             // for new NFTs we check:
