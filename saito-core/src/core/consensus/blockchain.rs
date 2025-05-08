@@ -334,7 +334,12 @@ impl Blockchain {
                 // block 503 before block 453 when block 453 is our expected proper
                 // next block and we are getting blocks out-of-order because of
                 // connection or network issues.
-                if latest_block_hash != [0; 32] && latest_block_hash == self.get_latest_block_hash()
+                if latest_block_hash != [0; 32]
+                    && latest_block_hash == self.get_latest_block_hash()
+                    && (block_id
+                        > self
+                            .get_latest_block_id()
+                            .saturating_sub(self.genesis_period))
                 {
                     info!("blocks received out-of-order issue. handling edge case...");
 
@@ -376,10 +381,19 @@ impl Blockchain {
 
         // at this point we should have a shared ancestor or not
         // find out whether this new block is claiming to require chain-validation
-        if !am_i_the_longest_chain && self.is_new_chain_the_longest_chain(&new_chain, &old_chain) {
+        if !am_i_the_longest_chain
+            && (block_id
+                > self
+                    .get_latest_block_id()
+                    .saturating_sub(self.genesis_period))
+            && self.is_new_chain_the_longest_chain(&new_chain, &old_chain)
+        {
             debug!(
-                "new chain is the longest chain. changing am I the longest chain? {:?}",
-                block_hash.to_hex()
+                "new chain is the longest chain. changing am I the longest chain? {:?}. current block id : {} latest block id : {} genesis_period : {}",
+                block_hash.to_hex(),
+                block_id,
+                self.get_latest_block_id(),
+                self.genesis_period
             );
             am_i_the_longest_chain = true;
         }

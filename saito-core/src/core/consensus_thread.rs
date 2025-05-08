@@ -1487,7 +1487,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn receiving_old_blocks_again_test() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         NodeTester::delete_data().await.unwrap();
         let mut tester = NodeTester::new(10, None, None);
         let public_key = tester.get_public_key().await;
