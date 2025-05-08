@@ -1200,6 +1200,7 @@ impl Wallet {
         &mut self,
         staking_amount: Currency,
         latest_unlocked_block_id: BlockId,
+        last_valid_slips_in_block_id: BlockId,
     ) -> Result<Transaction, Error> {
         debug!(
             "creating staking transaction with amount : {:?}",
@@ -1211,8 +1212,11 @@ impl Wallet {
             ..Default::default()
         };
 
-        let (inputs, outputs) =
-            self.find_slips_for_staking(staking_amount, latest_unlocked_block_id)?;
+        let (inputs, outputs) = self.find_slips_for_staking(
+            staking_amount,
+            latest_unlocked_block_id,
+            last_valid_slips_in_block_id,
+        )?;
 
         for input in inputs {
             transaction.add_from_slip(input);
@@ -1233,6 +1237,7 @@ impl Wallet {
         &mut self,
         staking_amount: Currency,
         latest_unlocked_block_id: BlockId,
+        last_valid_slips_in_block_id: BlockId,
     ) -> Result<(Vec<Slip>, Vec<Slip>), std::io::Error> {
         debug!(
             "finding slips for staking : {:?} latest_unblocked_block_id: {:?} staking_slip_count: {:?}",
@@ -1249,6 +1254,10 @@ impl Wallet {
                 // slip cannot be used for staking yet
                 continue;
             }
+            if slip.block_id < last_valid_slips_in_block_id {
+                // slip is too old
+                continue;
+            }
 
             collected_amount += slip.amount;
 
@@ -1263,7 +1272,7 @@ impl Wallet {
 
         let mut should_break_slips = false;
         if collected_amount < staking_amount {
-            debug!("not enough funds in staking slips. searching in normal slips. current_balance : {:?}",self.available_balance);
+            debug!("not enough funds in staking slips. searching in normal slips. current_balance : {:?}", self.available_balance);
             let required_from_unspent_slips = staking_amount - collected_amount;
             let mut collected_from_unspent_slips: Currency = 0;
             let mut unspent_slips_to_remove = vec![];
@@ -1521,7 +1530,7 @@ mod tests {
         wallet.add_slip(1, 1, &slip, true, Some(&t.network));
         assert_eq!(wallet.available_balance, 1_000_000);
 
-        let result = wallet.find_slips_for_staking(1_000_000, 1);
+        let result = wallet.find_slips_for_staking(1_000_000, 1, 0);
         assert!(result.is_ok());
         let (inputs, outputs) = result.unwrap();
         assert_eq!(inputs.len(), 1);
@@ -1533,7 +1542,7 @@ mod tests {
         assert_eq!(wallet.unspent_slips.len(), 0);
         assert_eq!(wallet.available_balance, 0);
 
-        let result = wallet.find_slips_for_staking(1_000, 2);
+        let result = wallet.find_slips_for_staking(1_000, 2, 0);
         assert!(result.is_err());
 
         assert_eq!(wallet.staking_slips.len(), 0);
@@ -1547,7 +1556,7 @@ mod tests {
         slip.generate_utxoset_key();
         wallet.add_slip(1, 2, &slip, true, Some(&t.network));
 
-        let result = wallet.find_slips_for_staking(1_000_000, 2);
+        let result = wallet.find_slips_for_staking(1_000_000, 2, 0);
         assert!(result.is_err());
         assert_eq!(wallet.staking_slips.len(), 0);
         assert_eq!(wallet.unspent_slips.len(), 1);
@@ -1569,7 +1578,7 @@ mod tests {
         wallet.add_slip(1, 1, &slip, true, Some(&t.network));
         assert_eq!(wallet.available_balance, 2_500_000);
 
-        let result = wallet.find_slips_for_staking(1_000_000, 1);
+        let result = wallet.find_slips_for_staking(1_000_000, 1, 0);
         assert!(result.is_ok());
         let (inputs, outputs) = result.unwrap();
         assert_eq!(inputs.len(), 1);
@@ -1587,7 +1596,7 @@ mod tests {
         assert_eq!(wallet.unspent_slips.len(), 0);
         assert_eq!(wallet.available_balance, 0);
 
-        let result = wallet.find_slips_for_staking(1_000, 2);
+        let result = wallet.find_slips_for_staking(1_000, 2, 0);
         assert!(result.is_err());
 
         assert_eq!(wallet.staking_slips.len(), 0);
@@ -1601,7 +1610,7 @@ mod tests {
         slip.generate_utxoset_key();
         wallet.add_slip(1, 2, &slip, true, Some(&t.network));
 
-        let result = wallet.find_slips_for_staking(1_000_000, 2);
+        let result = wallet.find_slips_for_staking(1_000_000, 2, 0);
         assert!(result.is_err());
         assert_eq!(wallet.staking_slips.len(), 0);
         assert_eq!(wallet.unspent_slips.len(), 1);
@@ -1624,7 +1633,7 @@ mod tests {
         wallet.add_slip(1, 1, &slip, true, Some(&t.network));
         assert_eq!(wallet.available_balance, 0);
 
-        let result = wallet.find_slips_for_staking(1_000_000, 1);
+        let result = wallet.find_slips_for_staking(1_000_000, 1, 0);
         assert!(result.is_ok());
         let (inputs, outputs) = result.unwrap();
         assert_eq!(inputs.len(), 1);
@@ -1635,7 +1644,7 @@ mod tests {
         assert_eq!(wallet.unspent_slips.len(), 0);
         assert_eq!(wallet.available_balance, 0);
 
-        let result = wallet.find_slips_for_staking(1_000, 2);
+        let result = wallet.find_slips_for_staking(1_000, 2, 0);
         assert!(result.is_err());
 
         assert_eq!(wallet.staking_slips.len(), 0);

@@ -2,7 +2,6 @@ use std::cmp::max;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::io::Error;
-use std::ops::Deref;
 use std::sync::Arc;
 
 use ahash::{AHashMap, HashMap};
@@ -335,7 +334,12 @@ impl Blockchain {
                 // block 503 before block 453 when block 453 is our expected proper
                 // next block and we are getting blocks out-of-order because of
                 // connection or network issues.
-                if latest_block_hash != [0; 32] && latest_block_hash == self.get_latest_block_hash()
+                if latest_block_hash != [0; 32]
+                    && latest_block_hash == self.get_latest_block_hash()
+                    && (block_id
+                        > self
+                            .get_latest_block_id()
+                            .saturating_sub(self.genesis_period))
                 {
                     info!("blocks received out-of-order issue. handling edge case...");
 
@@ -370,14 +374,27 @@ impl Blockchain {
 
                     new_chain.clear();
                     new_chain.push(block_hash);
-                    am_i_the_longest_chain = true;
+                    am_i_the_longest_chain = false;
                 }
             }
         }
 
         // at this point we should have a shared ancestor or not
         // find out whether this new block is claiming to require chain-validation
-        if !am_i_the_longest_chain && self.is_new_chain_the_longest_chain(&new_chain, &old_chain) {
+        if !am_i_the_longest_chain
+            && (block_id
+                > self
+                    .get_latest_block_id()
+                    .saturating_sub(self.genesis_period))
+            && self.is_new_chain_the_longest_chain(&new_chain, &old_chain)
+        {
+            debug!(
+                "new chain is the longest chain. changing am I the longest chain? {:?}. current block id : {} latest block id : {} genesis_period : {}",
+                block_hash.to_hex(),
+                block_id,
+                self.get_latest_block_id(),
+                self.genesis_period
+            );
             am_i_the_longest_chain = true;
         }
 
@@ -547,7 +564,8 @@ impl Blockchain {
                 if writing_interval > 0
                     && block_id >= self.last_issuance_written_on + writing_interval
                 {
-                    self.write_issuance_file(0, storage).await;
+                    debug!("writing interval : {:?} last issuance written on : {:?}, writing for current block : {}", writing_interval, self.last_issuance_written_on, block_id);
+                    self.write_issuance_file(0, "", storage).await;
                     self.last_issuance_written_on = block_id;
                 }
             } else if block.block_type == BlockType::Header {
@@ -584,19 +602,30 @@ impl Blockchain {
         );
     }
 
-    pub async fn write_issuance_file(&self, threshold: Currency, storage: &mut Storage) {
+    pub async fn write_issuance_file(
+        &self,
+        threshold: Currency,
+        issuance_file_path: &str,
+        storage: &mut Storage,
+    ) {
         info!("utxo size : {:?}", self.utxoset.len());
 
         let data = self.get_utxoset_data();
 
         info!("{:?} entries in utxo to write to file", data.len());
         let latest_block = self.get_latest_block().unwrap();
-        let issuance_path = format!(
-            "./data/issuance/block_{}_{}_{}.issuance",
-            latest_block.timestamp,
-            latest_block.hash.to_hex(),
-            latest_block.id
-        );
+        let issuance_path: String;
+
+        if issuance_file_path.is_empty() {
+            issuance_path = format!(
+                "./data/issuance/block_{}_{}_{}.issuance",
+                latest_block.timestamp,
+                latest_block.hash.to_hex(),
+                latest_block.id
+            );
+        } else {
+            issuance_path = issuance_file_path.to_string();
+        }
 
         info!("opening file : {:?}", issuance_path);
 
@@ -1007,7 +1036,7 @@ impl Blockchain {
         }
 
         if self.blockring.get_latest_block_id() >= self.blocks.get(&new_chain[0]).unwrap().id {
-            trace!(
+            debug!(
                 "blockring latest : {:?} >= new chain block id : {:?}",
                 self.blockring.get_latest_block_id(),
                 self.blocks.get(&new_chain[0]).unwrap().id
@@ -2074,11 +2103,12 @@ impl Blockchain {
                 let slip = Slip::parse_slip_from_utxokey(key).unwrap();
 
                 // Check if UTXO is valid (not from an off-chain block)
-                if slip.block_id >= latest_block_id.saturating_sub(genesis_period) {
-                    // if no keys provided we get the full picture
-                    if keys.is_empty() || keys.contains(&slip.public_key) {
-                        snapshot.slips.push(slip);
-                    }
+                if slip.block_id < latest_block_id.saturating_sub(genesis_period) {
+                    return;
+                }
+                // if no keys provided we get the full picture
+                if keys.is_empty() || keys.contains(&slip.public_key) {
+                    snapshot.slips.push(slip);
                 }
             });
 
@@ -2144,23 +2174,35 @@ impl Blockchain {
         current_supply
     }
     pub async fn check_total_supply(&mut self, configs: &(dyn Configuration + Send + Sync)) {
-        if !self.has_total_supply_loaded(configs.get_consensus_config().unwrap().genesis_period) {
+        let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+
+        if !self.has_total_supply_loaded(genesis_period) {
             debug!("total supply not loaded yet. skipping check");
             return;
         }
+
         if configs.is_browser() || configs.is_spv_mode() {
             debug!("skipping total supply check in spv mode");
             return;
         }
 
+        let latest_block = self
+            .get_latest_block()
+            .expect("There should be a latest block in blockchain");
+
         let mut current_supply = 0;
         let amount_in_utxo = self
             .utxoset
             .iter()
-            .filter(|(_, value)| **value)
-            .map(|(key, value)| {
-                let slip = Slip::parse_slip_from_utxokey(key).unwrap();
-                info!(
+            .filter(|(_, &spent)| spent)
+            .filter_map(|(key, &spent)| {
+                let slip = Slip::parse_slip_from_utxokey(key).ok()?;
+
+                if slip.block_id < latest_block.id.saturating_sub(genesis_period) {
+                    return None;
+                }
+
+                trace!(
                     "Utxo : {:?} : {} : {:?}, block : {}-{}-{}, valid : {}",
                     slip.public_key.to_base58(),
                     slip.amount,
@@ -2168,53 +2210,60 @@ impl Blockchain {
                     slip.block_id,
                     slip.tx_ordinal,
                     slip.slip_index,
-                    value
+                    spent
                 );
-                slip.amount
+
+                Some(slip.amount)
             })
             .sum::<Currency>();
 
         current_supply += amount_in_utxo;
 
-        let latest_block = self
-            .get_latest_block()
-            .expect("There should be a latest block in blockchain");
         current_supply += latest_block.graveyard;
         current_supply += latest_block.treasury;
         current_supply += latest_block.previous_block_unpaid;
         current_supply += latest_block.total_fees;
 
         if self.initial_token_supply == 0 {
+            info!(
+                "initial token supply is not set. setting it to current supply : {}",
+                current_supply
+            );
             self.initial_token_supply = current_supply;
         }
 
         if current_supply != self.initial_token_supply {
             let latest_block = self.get_latest_block().unwrap();
-            debug!(
+            warn!(
                 "diff : {}",
                 self.initial_token_supply as i64 - current_supply as i64
             );
-            debug!("Current supply is {}", current_supply);
-            debug!("Initial token supply is {}", self.initial_token_supply);
-            debug!(
+            warn!("Current supply is {}", current_supply);
+            warn!("Initial token supply is {}", self.initial_token_supply);
+            warn!(
                 "Social Stake Requirement is {}",
                 self.social_stake_requirement
             );
-            debug!("Graveyard is {}", latest_block.graveyard);
-            debug!("Treasury is {}", latest_block.treasury);
-            debug!("Unpaid fees is {}", latest_block.previous_block_unpaid);
-            debug!("Total Fees ATR is {}", latest_block.total_fees_atr);
-            debug!("Total Fees New is {}", latest_block.total_fees_new);
-            debug!("Total Fee is {}", latest_block.total_fees);
-            debug!("Amount in utxo {}", amount_in_utxo);
+            warn!("Graveyard is {}", latest_block.graveyard);
+            warn!("Treasury is {}", latest_block.treasury);
+            warn!("Unpaid fees is {}", latest_block.previous_block_unpaid);
+            warn!("Total Fees ATR is {}", latest_block.total_fees_atr);
+            warn!("Total Fees New is {}", latest_block.total_fees_new);
+            warn!("Total Fee is {}", latest_block.total_fees);
+            warn!("Amount in utxo {}", amount_in_utxo);
 
-            info!("latest block : {}", latest_block);
+            warn!("latest block : {}", latest_block);
             warn!(
                 "current supply : {:?} doesn't equal to initial supply : {:?}",
                 current_supply, self.initial_token_supply
             );
+            latest_block.print_all();
             panic!("cannot continue with invalid total supply");
         }
+        debug!(
+            "total supply check passed. current supply : {:?} initial supply : {:?}",
+            current_supply, self.initial_token_supply
+        );
     }
 }
 
