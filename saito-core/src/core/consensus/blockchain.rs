@@ -334,7 +334,12 @@ impl Blockchain {
                 // block 503 before block 453 when block 453 is our expected proper
                 // next block and we are getting blocks out-of-order because of
                 // connection or network issues.
-                if latest_block_hash != [0; 32] && latest_block_hash == self.get_latest_block_hash()
+                if latest_block_hash != [0; 32]
+                    && latest_block_hash == self.get_latest_block_hash()
+                    && (block_id
+                        > self
+                            .get_latest_block_id()
+                            .saturating_sub(self.genesis_period))
                 {
                     info!("blocks received out-of-order issue. handling edge case...");
 
@@ -369,14 +374,27 @@ impl Blockchain {
 
                     new_chain.clear();
                     new_chain.push(block_hash);
-                    am_i_the_longest_chain = true;
+                    am_i_the_longest_chain = false;
                 }
             }
         }
 
         // at this point we should have a shared ancestor or not
         // find out whether this new block is claiming to require chain-validation
-        if !am_i_the_longest_chain && self.is_new_chain_the_longest_chain(&new_chain, &old_chain) {
+        if !am_i_the_longest_chain
+            && (block_id
+                > self
+                    .get_latest_block_id()
+                    .saturating_sub(self.genesis_period))
+            && self.is_new_chain_the_longest_chain(&new_chain, &old_chain)
+        {
+            debug!(
+                "new chain is the longest chain. changing am I the longest chain? {:?}. current block id : {} latest block id : {} genesis_period : {}",
+                block_hash.to_hex(),
+                block_id,
+                self.get_latest_block_id(),
+                self.genesis_period
+            );
             am_i_the_longest_chain = true;
         }
 
@@ -1018,7 +1036,7 @@ impl Blockchain {
         }
 
         if self.blockring.get_latest_block_id() >= self.blocks.get(&new_chain[0]).unwrap().id {
-            trace!(
+            debug!(
                 "blockring latest : {:?} >= new chain block id : {:?}",
                 self.blockring.get_latest_block_id(),
                 self.blocks.get(&new_chain[0]).unwrap().id
@@ -2085,11 +2103,12 @@ impl Blockchain {
                 let slip = Slip::parse_slip_from_utxokey(key).unwrap();
 
                 // Check if UTXO is valid (not from an off-chain block)
-                if slip.block_id >= latest_block_id.saturating_sub(genesis_period) {
-                    // if no keys provided we get the full picture
-                    if keys.is_empty() || keys.contains(&slip.public_key) {
-                        snapshot.slips.push(slip);
-                    }
+                if slip.block_id < latest_block_id.saturating_sub(genesis_period) {
+                    return;
+                }
+                // if no keys provided we get the full picture
+                if keys.is_empty() || keys.contains(&slip.public_key) {
+                    snapshot.slips.push(slip);
                 }
             });
 
