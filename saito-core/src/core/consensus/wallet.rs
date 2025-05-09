@@ -190,36 +190,22 @@ impl Wallet {
                 let mut i = 0;
                 while i < tx.to.len() {
                     let output = &tx.to[i];
-                    let mut is_this_an_nft = false;
-
                     //
                     // if the output is a bound slip, then we are expecting
                     // the 2nd slip to be NORMAL and the 3rd slip to be another
                     // bound slip.
                     //
-                    if output.slip_type == SlipType::Bound {
-                        //
-                        // is this an NFT ?
-                        //
-                        // note that we do not need to validate that the NFT meets the
-                        // criteria here as we only process blocks that pass validation
-                        // requirements. so we are just doing a superficial check to
-                        // make sure that we will not be "skipping" any normal slips
-                        // before inserting into the wallet
-                        //
-                        if i + 2 < tx.to.len() {
-                            let slip1 = &tx.to[i];
-                            let slip2 = &tx.to[i + 1];
-                            let slip3 = &tx.to[i + 2];
 
-                            if slip1.slip_type == SlipType::Bound
-                                && slip3.slip_type == SlipType::Bound
-                                && slip2.slip_type != SlipType::Bound
-                            {
-                                is_this_an_nft = true;
-                            }
-                        }
-                    }
+                    //
+                    // is this an NFT ?
+                    //
+                    // note that we do not need to validate that the NFT meets the
+                    // criteria here as we only process blocks that pass validation
+                    // requirements. so we are just doing a superficial check to
+                    // make sure that we will not be "skipping" any normal slips
+                    // before inserting into the wallet
+                    //
+                    let is_this_an_nft = tx.is_nft(&tx.to, i);
 
                     //
                     // NFT slips are added to a separate data-storage space, so that
@@ -268,36 +254,13 @@ impl Wallet {
                 let mut i = 0;
                 while i < tx.from.len() {
                     let input = &tx.from[i];
-                    let mut is_this_an_nft = false;
 
                     //
                     // if the output is a bound slip, then we are expecting
                     // the 2nd slip to be NORMAL and the 3rd slip to be another
                     // bound slip.
                     //
-                    if input.slip_type == SlipType::Bound {
-                        //
-                        // is this an NFT ?
-                        //
-                        // note that we do not need to validate that the NFT meets the
-                        // criteria here as we only process blocks that pass validation
-                        // requirements. so we are just doing a superficial check to
-                        // make sure that we will not be "skipping" any normal slips
-                        // before inserting into the wallet
-                        //
-                        if i + 2 < tx.from.len() {
-                            let slip1 = &tx.to[i];
-                            let slip2 = &tx.to[i + 1];
-                            let slip3 = &tx.to[i + 2];
-
-                            if slip1.slip_type == SlipType::Bound
-                                && slip3.slip_type == SlipType::Bound
-                                && slip2.slip_type != SlipType::Bound
-                            {
-                                is_this_an_nft = true;
-                            }
-                        }
-                    }
+                    let is_this_an_nft = tx.is_nft(&tx.from, i);
 
                     //
                     // NFT slips are removed from the existing NFT storage
@@ -371,19 +334,8 @@ impl Wallet {
                 let mut i = 0;
                 while i < tx.to.len() {
                     let output = &tx.to[i];
-                    let mut is_this_an_nft = false;
 
-                    if output.slip_type == SlipType::Bound && i + 2 < tx.to.len() {
-                        let slip1 = &tx.to[i];
-                        let slip2 = &tx.to[i + 1];
-                        let slip3 = &tx.to[i + 2];
-                        if slip1.slip_type == SlipType::Bound
-                            && slip3.slip_type == SlipType::Bound
-                            && slip2.slip_type != SlipType::Bound
-                        {
-                            is_this_an_nft = true;
-                        }
-                    }
+                    let is_this_an_nft = tx.is_nft(&tx.to, i);
 
                     if is_this_an_nft {
                         //
@@ -417,22 +369,11 @@ impl Wallet {
                 let mut i = 0;
                 while i < tx.from.len() {
                     let input = &tx.from[i];
-                    let mut is_this_an_nft = false;
 
                     //
                     // NFT group check
                     //
-                    if input.slip_type == SlipType::Bound && i + 2 < tx.from.len() {
-                        let slip1 = &tx.from[i];
-                        let slip2 = &tx.from[i + 1];
-                        let slip3 = &tx.from[i + 2];
-                        if slip1.slip_type == SlipType::Bound
-                            && slip3.slip_type == SlipType::Bound
-                            && slip2.slip_type != SlipType::Bound
-                        {
-                            is_this_an_nft = true;
-                        }
-                    }
+                    let is_this_an_nft = tx.is_nft(&tx.from, i);
 
                     if is_this_an_nft {
                         //

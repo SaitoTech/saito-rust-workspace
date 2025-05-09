@@ -1634,6 +1634,22 @@ impl Transaction {
     pub fn is_to(&self, public_key: &SaitoPublicKey) -> bool {
         iterate!(self.to, 10).any(|slip| slip.public_key.eq(public_key))
     }
+
+    //
+    // Returns true if the given slice of slips at `i` forms a
+    // Bound–Normal–Bound triple (an NFT group).
+    //
+    pub fn is_nft(&self, slips: &[Slip], i: usize) -> bool {
+        if i + 2 >= slips.len() {
+            return false;
+        }
+        let a = &slips[i];
+        let b = &slips[i + 1];
+        let c = &slips[i + 2];
+        a.slip_type == SlipType::Bound
+            && c.slip_type == SlipType::Bound
+            && b.slip_type != SlipType::Bound
+    }
 }
 
 #[cfg(test)]

@@ -353,18 +353,6 @@ export default class Saito {
         nft_type: string, 
     ): Promise<T> {
 
-      console.log("values recieved at saito.ts:");
-      console.log(amt);
-      console.log(bid);
-      console.log(tid);
-      console.log(sid);
-      console.log(num);
-      console.log(deposit);
-      console.log(change);
-      console.log(data);
-      console.log(fee);
-      console.log(recipient_public_key);
-
         let wasmTx = await Saito.getLibInstance().create_bound_transaction(
             amt,
             bid,
@@ -394,12 +382,7 @@ export default class Saito {
       data: string = "",
       recipient_public_key: string
     ): Promise<T> {
-      console.log("Transfer NFT parameters:");
-      console.log("Amount:", amt);
-      console.log("NFT id:", nft_id);
-      console.log("Data:", data);
-      console.log("New recipient public key:", recipient_public_key);
-
+      
       let wasmTx = await Saito.getLibInstance().create_send_bound_transaction(
         amt,
         nft_id,
