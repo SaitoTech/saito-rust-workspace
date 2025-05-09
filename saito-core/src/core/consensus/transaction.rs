@@ -437,7 +437,6 @@ impl Transaction {
             output2.slip_type = SlipType::ATR;
             tx.add_to_slip(output2);
         }
-        tx.add_to_slip(slip2);
         tx.add_to_slip(slip3);
 
         tx.generate_total_fees(0, 0);
@@ -1192,8 +1191,6 @@ impl Transaction {
             // we have, so we check first to see which is which.
             //
 
-            info!("self tx: {:?}", self);
-
             //
             // classify as “new NFT” if exactly 1 Normal input and ≥3 outputs
             //
@@ -1437,8 +1434,10 @@ impl Transaction {
                 //
                 if self.from[0].public_key != self.to[0].public_key {
                     error!(
-                        "Send-bound Transaction: NFT slip #1 has modified publickey {:?}",
-                        self.from[0]
+                        "Send-bound Transaction: NFT slip #1 has modified publickey. Input slip1 {:?}, 
+                        output slip1: {:?}",
+                        self.from[0],
+                        self.to[0]
                     );
                     return false;
                 }
