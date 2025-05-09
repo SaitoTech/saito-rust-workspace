@@ -1339,7 +1339,7 @@ impl Transaction {
                 if self.from.len() < 3 {
                     error!(
                         "Send bound transaction Invalid: fewer than 3 inputs, found {}.",
-                        self.to.len()
+                        self.from.len()
                     );
                     return false;
                 }
@@ -1361,8 +1361,8 @@ impl Transaction {
                     || self.from[2].slip_type != SlipType::Bound
                 {
                     error!(
-                        "Send-bound transaction: slip1 or slip3 not bound slips {:?}",
-                        self.from.len()
+                        "Send-bound transaction: Input slip1 {:?} or slip3 not bound slips {:?}",
+                        self.from[0], self.from[2]
                     );
                     return false;
                 }
@@ -1372,8 +1372,8 @@ impl Transaction {
                 //
                 if self.from[1].slip_type != SlipType::Normal {
                     error!(
-                        "Send-bound transaction: slip2 nor normal slip {:?}",
-                        self.from.len()
+                        "Send-bound transaction: Input slip2 not normal slip {:?}",
+                        self.from[1]
                     );
                     return false;
                 }
@@ -1385,8 +1385,8 @@ impl Transaction {
                     || self.to[2].slip_type != SlipType::Bound
                 {
                     error!(
-                        "Send-bound transaction: slip1 or slip3 not bound slips {:?}",
-                        self.to.len()
+                        "Send-bound transaction: Output slip1 {:?} or slip3 not bound slips {:?}",
+                        self.to[0], self.to[2]
                     );
                     return false;
                 }
@@ -1396,8 +1396,8 @@ impl Transaction {
                 //
                 if self.to[1].slip_type != SlipType::Normal {
                     error!(
-                        "Send-bound transaction: slip2 nor normal slip {:?}",
-                        self.to.len()
+                        "Send-bound transaction: Output slip2 not normal slip {:?}",
+                        self.to[1]
                     );
                     return false;
                 }
@@ -1411,7 +1411,7 @@ impl Transaction {
                     if slip.slip_type != SlipType::Normal {
                         error!(
                             "Send-bound Transaction: created tx has unexpected non-normal slip (found {:?}).",
-                            slip.slip_type
+                            slip
                         );
                         return false;
                     }
@@ -1426,7 +1426,7 @@ impl Transaction {
                     if slip.slip_type != SlipType::Normal {
                         error!(
                             "Send-bound Transaction: created tx has unexpected non-normal slip (found {:?}).",
-                            slip.slip_type
+                            slip
                         );
                         return false;
                     }
@@ -1438,7 +1438,7 @@ impl Transaction {
                 if self.from[0].public_key != self.to[0].public_key {
                     error!(
                         "Send-bound Transaction: NFT slip #1 has modified publickey {:?}",
-                        self.from[0].public_key
+                        self.from[0]
                     );
                     return false;
                 }
@@ -1449,7 +1449,7 @@ impl Transaction {
                 if self.from[2].public_key != self.to[2].public_key {
                     error!(
                         "Send-bound Transaction: NFT slip #3 has modified publickey {:?}",
-                        self.from[2].public_key
+                        self.from[2]
                     );
                     return false;
                 }
@@ -1459,8 +1459,8 @@ impl Transaction {
                 //
                 if self.from[0].amount != self.to[0].amount {
                     error!(
-                        "Send-bound Transaction: NFT slip #1 has modified amount {:?}",
-                        self.from[0].amount
+                        "Send-bound Transaction: NFT slip #3 has modified amount {:?}",
+                        self.from[0]
                     );
                     return false;
                 }
@@ -1470,19 +1470,19 @@ impl Transaction {
                 //
                 if self.from[2].amount != self.to[2].amount {
                     error!(
-                        "Send-bound Transaction: NFT slip #1 has modified amount {:?}",
-                        self.from[2].amount
+                        "Send-bound Transaction: NFT slip #3 has modified amount {:?}",
+                        self.from[2]
                     );
                     return false;
                 }
 
                 //
-                // slip #2 is 0 amount
+                // input slip3 is 0 amount
                 //
                 if self.from[2].amount != 0 {
                     error!(
-                        "Send-bound Transaction: NFT slip #1 has modified amount {:?}",
-                        self.from[2].amount
+                        "Send-bound Transaction: NFT slip #3 has modified amount {:?}",
+                        self.from[2]
                     );
                     return false;
                 }
