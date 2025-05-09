@@ -1402,7 +1402,7 @@ impl Transaction {
                 //
                 // any additional input slips are not BoundSlips
                 //
-                // outputs[3..] = Normal
+                // inputs[3..] = Normal
                 //
                 for slip in self.from.iter().skip(3) {
                     if slip.slip_type != SlipType::Normal {
@@ -1419,7 +1419,7 @@ impl Transaction {
                 //
                 // outputs[3..] = Normal
                 //
-                for slip in self.from.iter().skip(3) {
+                for slip in self.to.iter().skip(3) {
                     if slip.slip_type != SlipType::Normal {
                         error!(
                             "Send-bound Transaction: created tx has unexpected non-normal slip (found {:?}).",
