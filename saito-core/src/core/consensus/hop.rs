@@ -171,5 +171,8 @@ mod tests {
         buffer.extend(hop.to.to_vec());
         let result = verify(buffer.as_slice(), &hop.sig, &hop.from);
         assert!(result);
+
+        let result = Hop::deserialize_from_net(&vec![]);
+        assert!(result.is_err());
     }
 }

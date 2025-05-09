@@ -341,6 +341,8 @@ mod tests {
         assert_eq!(serialized_slip.len(), SLIP_SIZE);
         let deserilialized_slip = Slip::deserialize_from_net(&serialized_slip).unwrap();
         assert_eq!(slip, deserilialized_slip);
+        let result = Slip::deserialize_from_net(&vec![]);
+        assert!(result.is_err());
     }
 
     #[tokio::test]
