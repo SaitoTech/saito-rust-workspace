@@ -618,7 +618,7 @@ impl Blockchain {
 
         if issuance_file_path.is_empty() {
             issuance_path = format!(
-                "./data/issuance/block_{}_{}_{}.issuance",
+                "./data/issuance/archive/block_{}_{}_{}.issuance",
                 latest_block.timestamp,
                 latest_block.hash.to_hex(),
                 latest_block.id
@@ -658,6 +658,10 @@ impl Blockchain {
             let buf = s.as_bytes();
             buffer.extend(buf);
         }
+
+        storage
+            .io_interface
+            .ensure_block_directory_exists("./data/issuance/archive");
 
         storage
             .io_interface
