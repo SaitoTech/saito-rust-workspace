@@ -2102,11 +2102,23 @@ impl Blockchain {
             .for_each(|(key, _)| {
                 let slip = Slip::parse_slip_from_utxokey(key).unwrap();
 
+                //
+                // Skip any Bound‐type slips
+                //
+                if slip.slip_type == SlipType::Bound {
+                    return;
+                }
+
+                //
                 // Check if UTXO is valid (not from an off-chain block)
+                //
                 if slip.block_id < latest_block_id.saturating_sub(genesis_period) {
                     return;
                 }
+
+                //
                 // if no keys provided we get the full picture
+                //
                 if keys.is_empty() || keys.contains(&slip.public_key) {
                     snapshot.slips.push(slip);
                 }
@@ -2198,6 +2210,15 @@ impl Blockchain {
             .filter_map(|(key, &spent)| {
                 let slip = Slip::parse_slip_from_utxokey(key).ok()?;
 
+                //
+                // Skip any Bound‐type slips
+                //
+                if slip.slip_type == SlipType::Bound {
+                    return None;
+                }
+
+                //
+                // skip old UTXOs outside the genesis window
                 if slip.block_id < latest_block.id.saturating_sub(genesis_period) {
                     return None;
                 }
