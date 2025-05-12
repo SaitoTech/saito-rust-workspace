@@ -641,7 +641,7 @@ impl Transaction {
             .iter_mut()
             .enumerate()
             .map(|(index, slip)| {
-                if slip.slip_type != SlipType::ATR && slip.slip_type != SlipType::Bound {
+                if slip.slip_type != SlipType::ATR || slip.slip_type != SlipType::Bound {
                     slip.block_id = block_id;
                     slip.tx_ordinal = tx_index;
                     slip.slip_index = index as u8;
