@@ -1576,6 +1576,7 @@ impl Block {
                             // We accumulate total_nolan_eligible_for_atr_payout as we go.
                             //
                             let mut i = 0;
+
                             while i < transaction.to.len() {
                                 let slip = &transaction.to[i];
 
@@ -1675,9 +1676,13 @@ impl Block {
                                         //
                                         // Compute payout based on the payload slip2
                                         //
-                                        let payout = slip2.amount * expected_atr_multiplier;
+                                        let atr_payout_for_slip =
+                                            slip2.amount * expected_atr_multiplier;
+                                        let surplus_payout_to_subtract_from_treasury =
+                                            atr_payout_for_slip - slip2.amount;
+                                        let atr_fee_for_slip = atr_fee;
 
-                                        if payout > atr_fee {
+                                        if atr_payout_for_slip > atr_fee {
                                             cv.total_rebroadcast_nolan += slip2.amount;
                                             cv.total_rebroadcast_slips += 1;
 
@@ -1691,7 +1696,7 @@ impl Block {
                                             //
                                             // for fee accounting of payload
                                             //
-                                            input2.amount = payout;
+                                            input2.amount = atr_payout_for_slip;
 
                                             //
                                             // Prepare output slips, only payload slip carries ATR amount
@@ -1701,7 +1706,7 @@ impl Block {
                                             let mut output3 = slip3.clone();
 
                                             output2.slip_type = SlipType::ATR;
-                                            output2.amount = payout - atr_fee;
+                                            output2.amount = atr_payout_for_slip - atr_fee;
 
                                             //
                                             // Create a special rebroadcast for triple NFT group
@@ -1714,7 +1719,8 @@ impl Block {
                                                     output3,
                                                 );
 
-                                            cv.total_payout_atr += payout - slip2.amount;
+                                            cv.total_payout_atr +=
+                                                surplus_payout_to_subtract_from_treasury;
                                             cv.total_fees_atr += atr_fee;
 
                                             //
@@ -1733,6 +1739,9 @@ impl Block {
                                             //
                                             cv.total_rebroadcast_nolan += slip2.amount;
                                             cv.total_fees_atr += slip2.amount;
+                                            cv.total_fees_paid_by_nonrebroadcast_atr_transactions +=
+                                                slip2.amount;
+                                            trace!("we don't rebroadcast slip in tx - {:?} since atr_payout_for_slip = {:?} atr_fee = {:?} \n{}",transaction.hash_for_signature.unwrap().to_hex(),atr_payout_for_slip,atr_fee,output);
                                         }
 
                                         //
@@ -1743,45 +1752,74 @@ impl Block {
                                         //
                                         //  Single-slip case
                                         //
-                                        let payout = output.amount * expected_atr_multiplier;
+                                        let atr_payout_for_slip =
+                                            output.amount * expected_atr_multiplier;
+                                        let surplus_payout_to_subtract_from_treasury =
+                                            atr_payout_for_slip - output.amount;
+                                        let atr_fee_for_slip = atr_fee;
 
-                                        if payout > atr_fee {
+                                        if atr_payout_for_slip > atr_fee {
                                             cv.total_rebroadcast_nolan += output.amount;
                                             cv.total_rebroadcast_slips += 1;
 
                                             //
-                                            // Build ATR input/output for single slip
+                                            // clone the slip, update the amount
                                             //
-                                            let mut in_slip = output.clone();
-                                            in_slip.amount = payout;
+                                            let mut slip = output.clone();
+                                            slip.slip_type = SlipType::ATR;
+                                            slip.amount = atr_payout_for_slip - atr_fee_for_slip;
 
-                                            let mut out_slip = output.clone();
-                                            out_slip.slip_type = SlipType::ATR;
-                                            out_slip.amount = payout - atr_fee;
+                                            //
+                                            // we update the "input" slip so that it
+                                            // will result in cumulative fees being
+                                            // calculated correctly when the TX is
+                                            // examined....
+                                            //
+                                            let mut from_slip = output.clone();
+                                            from_slip.amount = atr_payout_for_slip;
 
+                                            //
+                                            // track payouts and fees
+                                            //
+                                            cv.total_payout_atr +=
+                                                surplus_payout_to_subtract_from_treasury;
+                                            cv.total_fees_atr += atr_fee_for_slip;
+
+                                            //
+                                            // create our ATR rebroadcast transaction
+                                            //
                                             let rebroadcast_tx =
                                                 Transaction::create_rebroadcast_transaction(
                                                     transaction,
-                                                    out_slip,
-                                                    in_slip,
+                                                    slip,
+                                                    from_slip,
                                                 );
-                                            cv.total_payout_atr += payout - output.amount;
-                                            cv.total_fees_atr += atr_fee;
 
-                                            // Update cumulative ATR hash
-                                            let mut vbytes = Vec::new();
+                                            //
+                                            // update rebroadcast_hash (all ATRs)
+                                            //
+                                            let mut vbytes: Vec<u8> = vec![];
                                             vbytes.extend(&cv.rebroadcast_hash);
                                             vbytes
                                                 .extend(&rebroadcast_tx.serialize_for_signature());
                                             cv.rebroadcast_hash = hash(&vbytes);
-
                                             cv.rebroadcasts.push(rebroadcast_tx);
                                         } else {
                                             //
                                             // Slip didn't cover fee
                                             //
+
+                                            //
+                                            // this UTXO will be worth less than zero if the atr_payout is
+                                            // added and then the atr_fee is deducted. so we do not rebroadcast
+                                            // it but collect the dust as a fee paid to the blockchain by the
+                                            // utxo with gratitude for its release.
+                                            //
                                             cv.total_rebroadcast_nolan += output.amount;
                                             cv.total_fees_atr += output.amount;
+                                            cv.total_fees_paid_by_nonrebroadcast_atr_transactions +=
+                                                output.amount;
+                                            trace!("we don't rebroadcast slip in tx - {:?} since atr_payout_for_slip = {:?} atr_fee = {:?} \n{}",transaction.hash_for_signature.unwrap().to_hex(),atr_payout_for_slip,atr_fee,output);
                                         }
 
                                         //
