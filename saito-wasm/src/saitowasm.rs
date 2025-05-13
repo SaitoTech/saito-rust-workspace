@@ -9,6 +9,7 @@ use crate::wasm_block::WasmBlock;
 use crate::wasm_blockchain::WasmBlockchain;
 use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
+use crate::wasm_nft::WasmNFT;
 use crate::wasm_peer::WasmPeer;
 use crate::wasm_slip::WasmSlip;
 use crate::wasm_time_keeper::WasmTimeKeeper;
@@ -23,7 +24,7 @@ use saito_core::core::consensus::context::Context;
 use saito_core::core::consensus::mempool::Mempool;
 use saito_core::core::consensus::peers::peer_collection::PeerCollection;
 use saito_core::core::consensus::transaction::{Transaction, TransactionType};
-use saito_core::core::consensus::wallet::Wallet;
+use saito_core::core::consensus::wallet::{Wallet, NFT};
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
     BlockId, Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
@@ -44,6 +45,7 @@ use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::{generate_keypair_from_private_key, sign};
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use secp256k1::SECP256K1;
+use std::convert::TryInto;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
@@ -510,6 +512,150 @@ pub async fn create_transaction_with_multiple_payments(
     let transaction = transaction.unwrap();
     let wasm_transaction = WasmTransaction::from_transaction(transaction);
     Ok(wasm_transaction)
+}
+
+#[wasm_bindgen]
+pub async fn create_bound_transaction(
+    amt: u64,
+    bid: u64,
+    tid: u64,
+    sid: u64,
+    num: u32,
+    deposit: u64,
+    change: u64,
+    data: String,
+    fee: u64,
+    recipient_public_key: JsString,
+    nft_type: JsString,
+) -> Result<WasmTransaction, JsValue> {
+    let saito = SAITO.lock().await;
+    let config_lock = saito.as_ref().unwrap().routing_thread.config_lock.clone();
+    let configs = config_lock.read().await;
+    let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+    let blockchain = saito.as_ref().unwrap().context.blockchain_lock.read().await;
+    let latest_block_id = blockchain.get_latest_block_id();
+    let mut wallet = saito.as_ref().unwrap().context.wallet_lock.write().await;
+
+    info!("Received in saitowasm.rs:");
+    info!("Amount: {}", amt);
+    info!("Bid: {}", bid);
+    info!("Tid: {}", tid);
+    info!("Sid: {}", sid);
+    info!("Num: {}", num);
+    info!("Deposit: {}", deposit);
+    info!("Change: {}", change);
+    info!("Image data JSON: {}", data);
+    info!("fee: {}", fee);
+    info!("recipient_public_key: {}", recipient_public_key);
+
+    // Convert the `data` string into a JSON object
+    let serialized_data = match serde_json::to_vec(&data) {
+        Ok(vec) => vec,
+        Err(e) => {
+            error!("Failed to serialize data: {}", e);
+            return Err(JsValue::from_str("Failed to serialize data"));
+        }
+    };
+
+    // Convert Vec<u8> into Vec<u32>
+    let serialized_data_u32: Vec<u32> = serialized_data
+        .chunks(4)
+        .map(|chunk| {
+            let mut bytes = [0u8; 4];
+            for (i, &byte) in chunk.iter().enumerate() {
+                bytes[i] = byte;
+            }
+            u32::from_le_bytes(bytes)
+        })
+        .collect();
+
+    let key = string_to_key(recipient_public_key).or(Err(JsValue::from(
+        "Failed parsing public key string to key",
+    )))?;
+
+    let transaction = wallet
+        .create_bound_transaction(
+            amt,
+            bid,
+            tid,
+            sid,
+            deposit,
+            serialized_data_u32,
+            &key,
+            Some(&saito.as_ref().unwrap().consensus_thread.network),
+            latest_block_id,
+            genesis_period,
+            nft_type.as_string().unwrap(),
+        )
+        .await;
+
+    if transaction.is_err() {
+        error!(
+            "failed creating transaction. {:?}",
+            transaction.err().unwrap()
+        );
+        return Err(JsValue::from("Failed creating transaction"));
+    }
+
+    let transaction = transaction.unwrap();
+
+    info!("wasm transaction: {:}", transaction);
+    let wasm_transaction = WasmTransaction::from_transaction(transaction);
+
+    Ok(wasm_transaction)
+}
+
+#[wasm_bindgen]
+pub async fn create_send_bound_transaction(
+    amt: u64,
+    nft_id: String,
+    data: String,
+    recipient_public_key: JsString,
+) -> Result<WasmTransaction, JsValue> {
+    let saito = SAITO.lock().await;
+    let mut wallet = saito.as_ref().unwrap().context.wallet_lock.write().await;
+
+    // Decode the NFT id hex string into a Vec<u8>
+    let nft_id_vec = hex::decode(&nft_id)
+        .map_err(|_| JsValue::from_str("Failed to decode nft_id hex string"))?;
+
+    let serialized_data =
+        serde_json::to_vec(&data).map_err(|_| JsValue::from_str("Failed to serialize data"))?;
+    let serialized_data_u32: Vec<u32> = serialized_data
+        .chunks(4)
+        .map(|chunk| {
+            let mut bytes = [0u8; 4];
+            for (i, &b) in chunk.iter().enumerate() {
+                bytes[i] = b;
+            }
+            u32::from_le_bytes(bytes)
+        })
+        .collect();
+
+    let key = string_to_key(recipient_public_key).or(Err(JsValue::from_str(
+        "Failed parsing public key string to key",
+    )))?;
+
+    let tx = wallet
+        .create_send_bound_transaction(amt, nft_id_vec, serialized_data_u32, &key)
+        .await
+        .map_err(|_| JsValue::from_str("Failed to transfer NFT transaction"))?;
+
+    let wasm_transaction = WasmTransaction::from_transaction(tx);
+    Ok(wasm_transaction)
+}
+
+#[wasm_bindgen]
+pub async fn get_nft_list() -> Result<Array, JsValue> {
+    let saito = SAITO.lock().await;
+    let wallet = saito.as_ref().unwrap().context.wallet_lock.read().await;
+
+    let nft_array = Array::new();
+    for nft in wallet.get_nft_list().iter() {
+        nft_array.push(&WasmNFT::from_nft(nft.clone()).into());
+    }
+
+    Ok(nft_array)
 }
 
 #[wasm_bindgen]

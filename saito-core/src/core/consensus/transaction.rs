@@ -395,6 +395,63 @@ impl Transaction {
     }
 
     //
+    // Builds an ATR rebroadcast transaction for a 3-slip NFT group:
+    // [Bound, Normal, Bound]
+    //
+    pub fn create_rebroadcast_bound_transaction(
+        transaction_to_rebroadcast: &Transaction,
+        slip1: Slip, // first Bound slip
+        slip2: Slip, // Normal slip (amount already includes payout)
+        slip3: Slip, // second Bound slip
+    ) -> Transaction {
+        let mut tx = Transaction::default();
+        tx.transaction_type = TransactionType::ATR;
+
+        // if this is the FIRST time we are rebroadcasting, we copy the
+        // original transaction into the message field in serialized
+        // form. this preserves the original message and its signature
+        // in perpetuity.
+        //
+        // if this is the SECOND or subsequent rebroadcast, we do not
+        // copy the ATR tx (no need for a meta-tx) and rather just update
+        // the message field with the original transaction (which is
+        // by definition already in the previous TX message space.
+        tx.data = if transaction_to_rebroadcast.transaction_type == TransactionType::ATR {
+            transaction_to_rebroadcast.data.clone()
+        } else {
+            transaction_to_rebroadcast.serialize_for_net()
+        };
+
+        // attach the three “input” slips
+        tx.add_from_slip(slip1.clone());
+        tx.add_from_slip(slip2.clone());
+        tx.add_from_slip(slip3.clone());
+
+        //
+        // attach the three output slips
+        // same Bound slips, but payload has slip_type=ATR
+        //
+        tx.add_to_slip(slip1);
+        {
+            let mut output2 = slip2.clone();
+            output2.slip_type = SlipType::ATR;
+            tx.add_to_slip(output2);
+        }
+        tx.add_to_slip(slip3);
+
+        tx.generate_total_fees(0, 0);
+
+        //
+        // signature is the ORIGINAL signature. this transaction
+        // will fail its signature check and then get analysed as
+        // a rebroadcast transaction because of its transaction type.
+        //
+        tx.signature = transaction_to_rebroadcast.signature;
+
+        tx
+    }
+
+    //
     // removes utxoset entries when block is deleted
     //
     pub async fn delete(&self, utxoset: &mut UtxoSet) -> bool {
@@ -662,7 +719,6 @@ impl Transaction {
             let half_of_routing_work: Currency = routing_work_available_to_public_key / 2;
             routing_work_available_to_public_key -= half_of_routing_work;
         }
-
         self.total_work_for_me = routing_work_available_to_public_key;
     }
 
@@ -894,6 +950,20 @@ impl Transaction {
         blockchain: &Blockchain,
         validate_against_utxo: bool,
     ) -> bool {
+        //
+        // there are various types of transactions which have different validation
+        // requirements. the most significant difference is between transactions that
+        // are implicit or created by the block producer (ATR / Fee) and transactions
+        // that are created by users and must be cryptographically signed, etc...
+
+        //
+        // Fee Transactions are validated in block.validate() because they must match
+        // the fee transaction that block.generate_consensus_values() would create given
+        // the contents of the block. for this reason, and because there can only be
+        // a single fee transaction per block, we do not need to do further work to
+        // validate them here.
+        //
+
         if self.from.len() > u8::MAX as usize {
             error!("ERROR: transaction has too many inputs");
             return false;
@@ -924,6 +994,12 @@ impl Transaction {
             return true;
         }
 
+        //
+        // SPV transactions are "ghost" transactions which are included in SPV/lite-
+        // blocks. these transactions are not permitted to create outputs, and are
+        // not processed by full-nodes, so cannot be included in valid full-blocks
+        // or consensus.
+        //
         if self.transaction_type == TransactionType::SPV {
             if self.total_fees > 0 {
                 error!("ERROR: SPV transaction contains invalid hash");
@@ -933,6 +1009,14 @@ impl Transaction {
             return true;
         }
 
+        //
+        // BlockStake transactions are a special class of transactions that are
+        // affixed to blocks in order to propose them. This is used to add a form
+        // of "social slashing" -- attackers who wish to spend their own money in
+        // a "joyride" attack can be slashed as needed if the network must be
+        // forked to deal with problems created by malicious participants at low
+        // levels of fee-throughput.
+        //
         if let TransactionType::BlockStake = self.transaction_type {
             let mut total_stakes = 0;
 
@@ -983,7 +1067,7 @@ impl Transaction {
         }
 
         //
-        // User-Sent Transactions
+        // User-Originated Transactions
         //
         // most transactions are identifiable by the public_key that
         // has signed their input transaction, but some transactions
@@ -992,23 +1076,32 @@ impl Transaction {
         //
         // ATR transactions
         // FEE transactions
+        // ISSUANCE transactions
+        //
+        // the following validation rules cover user-originated txs
+        // where we expect that the inputs are coming from valid
+        // SAITO tokens that exist on the network.
         //
         // the first set of validation criteria is applied only to
-        // user-sent transactions. validation criteria for the above
-        // classes of transactions are further down in this function.
-        // at the bottom is the validation criteria applied to ALL
-        // transaction types.
+        // validation criteria for the remaining classes of txs are
+        // further down iin this function.
+        //
         let transaction_type = self.transaction_type;
 
-        if transaction_type != TransactionType::ATR && transaction_type != TransactionType::Issuance
+        if self.transaction_type != TransactionType::ATR
+            && self.transaction_type != TransactionType::Issuance
         {
-            // validate sender exists
+            //
+            // must have sender
+            //
             if self.from.is_empty() {
                 error!("ERROR 582039: less than 1 input in transaction");
                 return false;
             }
 
-            // validate signature
+            //
+            // must have valid signature
+            //
             if let Some(hash_for_signature) = &self.hash_for_signature {
                 let sig: SaitoSignature = self.signature;
                 let public_key: SaitoPublicKey = self.from[0].public_key;
@@ -1022,31 +1115,36 @@ impl Transaction {
                     return false;
                 }
             } else {
+                //
                 // we reach here if we have not already calculated the hash
                 // that is checked by the signature. while we could auto-gen
                 // it here, we choose to throw an error to raise visibility of
                 // unexpected behavior.
+                //
                 error!("ERROR 757293: there is no hash for signature in a transaction");
                 return false;
             }
 
+            //
             // validate routing path sigs
             //
-            // a transaction without routing paths is valid, and pays off the
-            // sender in the payment lottery. but a transaction with an invalid
-            // routing path is fraudulent.
+            // it strengthens censorship-resistance and anti-MEV properties in the network
+            // if we refuse to let nodes include transactions that have not been routed to
+            // them. nonetheless, while we may add this restriction, it will also mean that
+            // the server will need to cryptographically sign the transactions that it is
+            // sending to itself, so for now we accept transactions WITHOUT routing paths
+            // but require that any transaction WITH a routing path must have a cryptograph-
+            // ically valid path.
+            //
             if !self.validate_routing_path() {
                 error!("ERROR 482033: routing paths do not validate, transaction invalid");
                 return false;
             }
 
-            // TODO : what happens to tokens when total_out < total_in
-            // validate we're not creating tokens out of nothing
+            //
+            // validate tokens are not created out of thin air
+            //
             if self.total_out > self.total_in && self.transaction_type != TransactionType::Fee {
-                warn!("{:?} in and {:?} out", self.total_in, self.total_out);
-                // for _z in self.outputs.iter() {
-                //     // info!("{:?} --- ", z.amount);
-                // }
                 error!("ERROR 802394: transaction spends more than it has available");
                 return false;
             }
@@ -1055,60 +1153,409 @@ impl Transaction {
         //
         // fee transactions
         //
-        if transaction_type == TransactionType::Fee {}
+        if self.transaction_type == TransactionType::Fee {}
 
         //
         // atr transactions
         //
-        if transaction_type == TransactionType::ATR {}
+        if self.transaction_type == TransactionType::ATR {}
 
         //
         // normal transactions
         //
-        if transaction_type == TransactionType::Normal {}
+        if self.transaction_type == TransactionType::Normal {}
 
         //
         // golden ticket transactions
         //
-        if transaction_type == TransactionType::GoldenTicket {}
+        if self.transaction_type == TransactionType::GoldenTicket {}
 
-        if transaction_type == TransactionType::Bound {
-            // TODO : check if bound slips have matching normal slips
+        //
+        // NFT transactions validation for Bound type
+        //
+        // NFTs can circulate on the network either as BoundTransactions, which are
+        // they type used to CREATE and SEND NFTs, or as ATR transactions which is
+        // what happens if the ATR mechanism rebroadcasts a BoundTransaction in
+        // order to keep it on the network.
+        //
+        // in the User-Originated Transaction sector above, we have already validated
+        // the routing paths, and fee amounts, of our BoundTransactions, so here we
+        // validate the NF-related requirements -- the organization of the slips in
+        // the transaction and whether the inputs/outputs match the NFT.
+        //
+        if self.transaction_type == TransactionType::Bound {
+            //
+            // this could either be a NEW nft that we have just created, or an NFT
+            // that already existed and is being sent from one address to another.
+            // our validation rules are slightly different depending on which case
+            // we have, so we check first to see which is which.
+            //
 
-            // first input slip should be non-zero
-            if let Some(slip) = self.from.first() {
-                if slip.amount == 0 {
-                    // first slip should have a value to make sure the NFT creator cannot mint multiple transactions with the same hash
+            //
+            // classify as “new NFT” if exactly 1 Normal input and ≥3 outputs
+            //
+            let is_this_a_new_nft = self.from.len() == 1
+                && self.from[0].slip_type == SlipType::Normal
+                && self.to.len() >= 3;
+
+            //
+            // for new NFTs we check:
+            //
+            // - at least three output slips
+            // - slip1 is bound
+            // - slip2 is normal
+            // - slip3 is bound
+            // - slip3.amount = 0
+            // - slips 4,5,6 etc are normal
+            //
+            if is_this_a_new_nft {
+                //
+                // at least 3 output slips
+                //
+                if self.to.len() < 3 {
+                    error!(
+                        "Bound Transaction Invalid: fewer than 3 outputs, found {}.",
+                        self.to.len()
+                    );
                     return false;
                 }
+
+                //
+                // slip1 + slip3 = bound
+                //
+                if self.to[0].slip_type != SlipType::Bound
+                    || self.to[2].slip_type != SlipType::Bound
+                {
+                    error!(
+                        "Create-bound transaction: slip1 or slip3 not bound slips {:?}",
+                        self.to.len()
+                    );
+                    return false;
+                }
+
+                //
+                // slip2 = normal
+                //
+                if self.to[1].slip_type != SlipType::Normal {
+                    error!(
+                        "Create-bound transaction: slip2 nor normal slip {:?}",
+                        self.to.len()
+                    );
+                    return false;
+                }
+
+                //
+                // slip3 = zero amount
+                //
+                if self.to[2].amount != 0 {
+                    error!(
+                        "Create-bound transaction: output 2 (tracking slip) amount is not zero (found {}).",
+                        self.to[2].amount
+                    );
+                    return false;
+                }
+
+                //
+                // any additional slips are not BoundSlips
+                //
+                // outputs[3..] = Normal
+                //
+                for slip in self.from.iter().skip(3) {
+                    if slip.slip_type != SlipType::Normal {
+                        error!(
+                            "Bound Transaction: created tx has unexpected non-normal slip (found {:?}).",
+                            slip.slip_type
+                        );
+                        return false;
+                    }
+                }
+
+                //
+                // This section ensures that the bound slip (output[2]) truly encodes
+                // the unique UTXO that was consumed to mint this NFT. We decode the 33‑byte
+                // public_key on output[2] to extract:
+                //
+                //  - rec_block_id   – the original block_id (bytes 0..8)
+                //  - rec_tx_ord     – the original transaction ordinal (bytes 8..16)
+                //  - rec_slip_id    – the original slip_index (byte 16)
+                //
+                // We then compare these directly against the values on the slip we burned
+                // (self.from[0]). If any differ, the NFT‑UUID was forged or tampered with.
+                //
+
+                // Extract the 33‑byte “UUID” from the third output slip
+                let uuid_pk = self.to[2].public_key;
+
+                // 1) Decode original block_id (8 bytes, big-endian)
+                let rec_block_id = u64::from_be_bytes(uuid_pk[0..8].try_into().unwrap());
+
+                // 2) Decode original transaction ordinal (next 8 bytes)
+                let rec_tx_ord = u64::from_be_bytes(uuid_pk[8..16].try_into().unwrap());
+
+                // 3) Decode original slip_index (1 byte)
+                let rec_slip_id = uuid_pk[16];
+
+                // The slip we actually consumed to mint this NFT
+                let original_input = &self.from[0];
+
+                // Directly verify each identifier
+                if rec_block_id != original_input.block_id
+                    || rec_tx_ord != original_input.tx_ordinal
+                    || rec_slip_id != original_input.slip_index
+                {
+                    error!("Create‑bound TX: NFT UUID identifiers do not match the consumed UTXO");
+                    return false;
+                }
+
+            //
+            // otherwise, this is an existing NFT which is being transferred between
+            // network addresses, in which case we have a slightly different set of
+            // checks.
+            //
+            // - at least three input slips
+            // - at least three output slips
+            // - input slip1 is bound
+            // - input slip2 is normal
+            // - input slip3 is bound
+            // - output slip1 is bound
+            // - output slip2 is normal
+            // - output slip3 is bound
+            // - input slips 4,5,6 etc are normal
+            // - output slips 4,5,6 etc are normal
+            //
+            // - input slip1 publickey matches output slip1 publickey
+            // - input slip3 publickey matches output slip3 publickey
+            // - input slip1 amount matches output slip1 amount
+            // - input slip3 amount matches output slip3 amount
+            // - slip1, slip2, slip3 are identical block_id, tx_id, and sequential slip_id
+            //
             } else {
-                return false;
+                //
+                // at least 3 input slips
+                //
+                if self.from.len() < 3 {
+                    error!(
+                        "Send bound transaction Invalid: fewer than 3 inputs, found {}.",
+                        self.from.len()
+                    );
+                    return false;
+                }
+                //
+                // at least 3 output slips
+                //
+                if self.to.len() < 3 {
+                    error!(
+                        "Send-bound transaction Invalid: fewer than 3 outputs, found {}.",
+                        self.to.len()
+                    );
+                    return false;
+                }
+
+                //
+                // input slip1 + slip3 = bound
+                //
+                if self.from[0].slip_type != SlipType::Bound
+                    || self.from[2].slip_type != SlipType::Bound
+                {
+                    error!(
+                        "Send-bound transaction: Input slip1 {:?} or slip3 not bound slips {:?}",
+                        self.from[0], self.from[2]
+                    );
+                    return false;
+                }
+
+                //
+                // input slip2 = normal
+                //
+                if self.from[1].slip_type != SlipType::Normal {
+                    error!(
+                        "Send-bound transaction: Input slip2 not normal slip {:?}",
+                        self.from[1]
+                    );
+                    return false;
+                }
+
+                //
+                // output slip1 + slip3 = bound
+                //
+                if self.to[0].slip_type != SlipType::Bound
+                    || self.to[2].slip_type != SlipType::Bound
+                {
+                    error!(
+                        "Send-bound transaction: Output slip1 {:?} or slip3 not bound slips {:?}",
+                        self.to[0], self.to[2]
+                    );
+                    return false;
+                }
+
+                //
+                // output slip2 = normal
+                //
+                if self.to[1].slip_type != SlipType::Normal {
+                    error!(
+                        "Send-bound transaction: Output slip2 not normal slip {:?}",
+                        self.to[1]
+                    );
+                    return false;
+                }
+
+                //
+                // any additional input slips are not BoundSlips
+                //
+                // inputs[3..] = Normal
+                //
+                for slip in self.from.iter().skip(3) {
+                    if slip.slip_type != SlipType::Normal {
+                        error!(
+                            "Send-bound Transaction: created tx has unexpected non-normal slip (found {:?}).",
+                            slip
+                        );
+                        return false;
+                    }
+                }
+
+                //
+                // any additional output slips are not BoundSlips
+                //
+                // outputs[3..] = Normal
+                //
+                for slip in self.to.iter().skip(3) {
+                    if slip.slip_type != SlipType::Normal {
+                        error!(
+                            "Send-bound Transaction: created tx has unexpected non-normal slip (found {:?}).",
+                            slip
+                        );
+                        return false;
+                    }
+                }
+
+                //
+                // input slip1 publickey matches output slip1 publickey
+                //
+                if self.from[0].public_key != self.to[0].public_key {
+                    error!(
+                        "Send-bound Transaction: NFT slip #1 has modified publickey. Input slip1 {:?}, 
+                        output slip1: {:?}",
+                        self.from[0],
+                        self.to[0]
+                    );
+                    return false;
+                }
+
+                //
+                // input slip3 publickey matches output slip3 publickey
+                //
+                if self.from[2].public_key != self.to[2].public_key {
+                    error!(
+                        "Send-bound Transaction: NFT slip #3 has modified publickey {:?}",
+                        self.from[2]
+                    );
+                    return false;
+                }
+
+                //
+                // input slip1 amount matches output slip1 amount
+                //
+                if self.from[0].amount != self.to[0].amount {
+                    error!(
+                        "Send-bound Transaction: NFT slip #3 has modified amount {:?}",
+                        self.from[0]
+                    );
+                    return false;
+                }
+
+                //
+                // input slip3 amount matches output slip3 amount
+                //
+                if self.from[2].amount != self.to[2].amount {
+                    error!(
+                        "Send-bound Transaction: NFT slip #3 has modified amount {:?}",
+                        self.from[2]
+                    );
+                    return false;
+                }
+
+                //
+                // input slip3 is 0 amount
+                //
+                if self.from[2].amount != 0 {
+                    error!(
+                        "Send-bound Transaction: NFT slip #3 has modified amount {:?}",
+                        self.from[2]
+                    );
+                    return false;
+                }
+
+                //
+                // FROM slips have the same block_id, transaction_id and sequential slip_ids
+                //
+                // this is to prevent funny business of sometone trying to attach a totally
+                // separate and un-bound normal slip as if it were the appropriate one.
+                //
+
+                let block_id0 = self.from[0].block_id;
+                let block_id1 = self.from[1].block_id;
+                let block_id2 = self.from[2].block_id;
+
+                if block_id0 != block_id1 || block_id1 != block_id2 {
+                    error!(
+                        "Send-bound TX: input slips have mismatched block_id ({} / {} / {}).",
+                        block_id0, block_id1, block_id2
+                    );
+                    return false;
+                }
+
+                let tx_ordinal0 = self.from[0].tx_ordinal;
+                let tx_ordinal1 = self.from[1].tx_ordinal;
+                let tx_ordinal2 = self.from[2].tx_ordinal;
+
+                if tx_ordinal0 != tx_ordinal1 || tx_ordinal1 != tx_ordinal2 {
+                    error!(
+                        "Send-bound TX: input slips have mismatched tx_ordinal ({} / {} / {}).",
+                        tx_ordinal0, tx_ordinal1, tx_ordinal2
+                    );
+                    return false;
+                }
+
+                let slip_index0 = self.from[0].slip_index;
+                let slip_index1 = self.from[1].slip_index;
+                let slip_index2 = self.from[2].slip_index;
+
+                if slip_index1 != slip_index0 + 1 || slip_index2 != slip_index1 + 1 {
+                    error!(
+                        "Send-bound TX: input slips slip_index are not sequential ({} / {} / {}).",
+                        slip_index0, slip_index1, slip_index2
+                    );
+                    return false;
+                }
             }
-
-            // validate input bound slips
-
-            // validate output bound slips
         } else {
-            if self
-                .from
-                .iter()
-                .any(|slip| slip.slip_type == SlipType::Bound)
-            {
-                // only bound txs can have bound slips
-                return false;
-            }
-            if self.to.iter().any(|slip| slip.slip_type == SlipType::Bound) {
-                // only bound txs can have bound slips
-                return false;
+            //
+            // the only other type of transaction that is permitted to have Bound Slips
+            // are ATR transactions, in the case that the ATR transactions are rebroad-
+            // casting a
+            //
+            if self.transaction_type != TransactionType::ATR {
+                if self
+                    .from
+                    .iter()
+                    .any(|slip| slip.slip_type == SlipType::Bound)
+                    || self.to.iter().any(|slip| slip.slip_type == SlipType::Bound)
+                {
+                    error!("Non-ATR and Non-Bound Transaction has Bound UTXO");
+                    return false;
+                }
             }
         }
 
         //
-        // all Transactions
+        // All Transactions
         //
         // The following validation criteria apply to all transactions, including
-        // those auto-generated and included in blocks.
+        // those auto-generated and included in blocks such as ATR transactions
+        // and fee transactions.
         //
+
         //
         // all transactions must have outputs
         //
@@ -1117,10 +1564,11 @@ impl Transaction {
             return false;
         }
 
+        //
+        // spent transaction slips must be spendable (in hashmap)
+        //
         return if validate_against_utxo {
-            // trace!("validating transaction against utxo ...");
             let inputs_validate = self.validate_against_utxoset(utxoset);
-            // trace!("validated transaction against utxo !");
             inputs_validate
         } else {
             true
@@ -1185,6 +1633,22 @@ impl Transaction {
     }
     pub fn is_to(&self, public_key: &SaitoPublicKey) -> bool {
         iterate!(self.to, 10).any(|slip| slip.public_key.eq(public_key))
+    }
+
+    //
+    // Returns true if the given slice of slips at `i` forms a
+    // Bound–Normal–Bound triple (an NFT group).
+    //
+    pub fn is_nft(&self, slips: &[Slip], i: usize) -> bool {
+        if i + 2 >= slips.len() {
+            return false;
+        }
+        let a = &slips[i];
+        let b = &slips[i + 1];
+        let c = &slips[i + 2];
+        a.slip_type == SlipType::Bound
+            && c.slip_type == SlipType::Bound
+            && b.slip_type != SlipType::Bound
     }
 }
 
