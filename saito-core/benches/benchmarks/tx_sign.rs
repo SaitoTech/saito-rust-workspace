@@ -2,7 +2,6 @@ use criterion::{black_box, criterion_group, Criterion};
 use hex::FromHex;
 use saito_core::core::consensus::{slip::Slip, transaction::Transaction};
 
-
 fn generate_tx(input_slip_count: u64, output_slip_count: u64, buffer_size: u64) -> Transaction {
     let mut tx = Transaction::default();
 
@@ -36,7 +35,7 @@ pub fn tx_sign(c: &mut Criterion) {
             black_box(tx.sign(&private_key));
         });
     });
-    c.bench_function("verifying tx with 0 slips and empty buffer", |b|{
+    c.bench_function("verifying tx with 0 slips and empty buffer", |b| {
         b.iter(|| {
             black_box(tx.verify());
         });

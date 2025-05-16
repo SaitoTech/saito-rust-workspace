@@ -1,5 +1,9 @@
 use criterion::{black_box, criterion_group, Criterion};
-use saito_core::core::consensus::{block::{Block,BlockType}, slip::Slip, transaction::Transaction};
+use saito_core::core::consensus::{
+    block::{Block, BlockType},
+    slip::Slip,
+    transaction::Transaction,
+};
 
 fn generate_tx(input_slip_count: u64, output_slip_count: u64, buffer_size: u64) -> Transaction {
     let mut tx = Transaction::default();

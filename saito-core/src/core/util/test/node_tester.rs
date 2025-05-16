@@ -433,6 +433,31 @@ pub mod test {
 
             Ok(())
         }
+        pub async fn wait_till_block_id_with_hash(
+            &mut self,
+            block_id: BlockId,
+            block_hash: SaitoHash,
+        ) -> Result<(), Error> {
+            let time_keeper = TestTimeKeeper {};
+            let timeout = time_keeper.get_timestamp_in_ms() + self.timeout_in_ms;
+            info!("waiting for block id : {}", block_id);
+            loop {
+                {
+                    let blockchain = self.routing_thread.blockchain_lock.read().await;
+                    if blockchain.contains_block_hash_at_block_id(block_id, block_hash) {
+                        break;
+                    }
+                }
+
+                self.run_event_loop_once().await;
+
+                if time_keeper.get_timestamp_in_ms() > timeout {
+                    panic!("request timed out");
+                }
+            }
+
+            Ok(())
+        }
         pub async fn wait_till_block_id_with_txs(
             &mut self,
             wait_till_block_id: BlockId,

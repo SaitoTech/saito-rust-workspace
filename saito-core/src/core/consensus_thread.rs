@@ -696,6 +696,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 #[cfg(test)]
 mod tests {
     use log::info;
+    use tracing_subscriber::filter::Directive;
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::Layer;
 
     use crate::core::consensus::block::Block;
     use crate::core::consensus::slip::SlipType;
@@ -707,6 +711,7 @@ mod tests {
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::node_tester::test::{NodeTester, TestTimeKeeper};
     use std::fs;
+    use std::str::FromStr;
 
     #[tokio::test]
     #[serial_test::serial]
@@ -1434,6 +1439,7 @@ mod tests {
                 .write_block_to_disk(&old_block.unwrap())
                 .await;
         }
+        let timer = tester.consensus_thread.timer.clone();
         drop(tester);
 
         // Check if the file count inside the data directory is 21
@@ -1451,7 +1457,7 @@ mod tests {
         }
 
         // reload the node
-        let mut tester = NodeTester::new(10, Some(private_key), None);
+        let mut tester = NodeTester::new(10, Some(private_key), Some(timer));
         tester.set_staking_enabled(false).await;
         tester.init().await.unwrap();
         tester.wait_till_block_id(100).await.unwrap();
@@ -1561,6 +1567,7 @@ mod tests {
                 block.transaction_map.clear();
                 block.created_hashmap_of_slips_spent_this_block = false;
                 block.safe_to_prune_transactions = false;
+                block.slips_spent_this_block.clear();
 
                 tester
                     .consensus_thread
@@ -1579,6 +1586,197 @@ mod tests {
             .await
             .get_latest_block_id();
         assert_eq!(latest_block_id_new, 100);
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+    }
+    fn setup_log() {
+        // switch to this for instrumentation
+        // console_subscriber::init();
+
+        let filter = tracing_subscriber::EnvFilter::builder()
+            .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+            .from_env_lossy();
+        let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
+        let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
+        let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
+        let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
+        let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
+        let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
+        let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
+        let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
+        let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
+        let filter = filter.add_directive(Directive::from_str("tokio::task=info").unwrap());
+        let filter = filter.add_directive(Directive::from_str("runtime::resource=info").unwrap());
+
+        // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
+
+        let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+        // let fmt_layer = fmt_layer.with_filter(FilterFn::new(|meta| {
+        //     !meta.target().contains("waker.clone") && !meta.target().contains("waker.drop") &&
+        // }));
+
+        tracing_subscriber::registry().with(fmt_layer).init();
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn receiving_out_of_order_blocks_test() {
+        // setup_log();
+        // pretty_env_logger::init();
+        NodeTester::delete_data().await.unwrap();
+        let mut tester = NodeTester::new(100, None, None);
+        let public_key = tester.get_public_key().await;
+        let private_key = tester.get_private_key().await;
+        tester.set_staking_requirement(2 * NOLAN_PER_SAITO, 8).await;
+        let issuance = vec![
+            (public_key.to_base58(), 8 * 2 * NOLAN_PER_SAITO),
+            (public_key.to_base58(), 100 * NOLAN_PER_SAITO),
+            (
+                "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(),
+                50 * NOLAN_PER_SAITO,
+            ),
+        ];
+        tester.set_issuance(issuance.clone()).await.unwrap();
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(1).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let mut blocks = vec![];
+        blocks.push(
+            tester
+                .consensus_thread
+                .blockchain_lock
+                .read()
+                .await
+                .get_latest_block()
+                .cloned()
+                .unwrap(),
+        );
+        assert_eq!(
+            tester
+                .consensus_thread
+                .blockchain_lock
+                .read()
+                .await
+                .get_latest_block_id(),
+            1
+        );
+        // create a main fork first
+        for i in 2..=100 {
+            let tx = tester
+                .create_transaction(NOLAN_PER_SAITO, 0, public_key)
+                .await
+                .unwrap();
+
+            tester.add_transaction(tx).await;
+            tester.wait_till_block_id(i).await.unwrap();
+
+            // if i >= 30 && i < 50 {
+            let block = tester
+                .consensus_thread
+                .blockchain_lock
+                .read()
+                .await
+                .get_latest_block()
+                .cloned();
+            blocks.push(block.clone().unwrap());
+            // }
+            tester
+                .check_total_supply()
+                .await
+                .expect("total supply should not change");
+        }
+
+        assert_eq!(blocks.len(), 100, "blocks length should be 100");
+        let latest_block_id = tester
+            .consensus_thread
+            .blockchain_lock
+            .read()
+            .await
+            .get_latest_block_id();
+        assert_eq!(latest_block_id, 100);
+        let timer = tester.consensus_thread.timer.clone();
+
+        NodeTester::delete_data().await.unwrap();
+        let mut tester = NodeTester::new(100, Some(private_key), Some(timer));
+        tester
+            .consensus_thread
+            .storage
+            .write_block_to_disk(&blocks.remove(0))
+            .await;
+        tester.set_staking_requirement(2 * NOLAN_PER_SAITO, 8).await;
+        tester.init().await.unwrap();
+
+        for mut block in blocks.drain(0..19) {
+            block.in_longest_chain = false;
+            block.transaction_map.clear();
+            block.created_hashmap_of_slips_spent_this_block = false;
+            block.safe_to_prune_transactions = false;
+            block.slips_spent_this_block.clear();
+
+            let block_id = block.id;
+            tester
+                .consensus_thread
+                .process_event(ConsensusEvent::BlockFetched {
+                    block: block,
+                    peer_index: 0,
+                })
+                .await;
+            tester.wait_till_block_id(block_id).await.unwrap();
+
+            if block_id == 20 {
+                break;
+            }
+        }
+        blocks.drain(0..10);
+
+        let latest_block_id = tester
+            .consensus_thread
+            .blockchain_lock
+            .read()
+            .await
+            .get_latest_block_id();
+        assert_eq!(latest_block_id, 20);
+
+        {
+            for mut block in blocks {
+                block.in_longest_chain = false;
+                block.transaction_map.clear();
+                block.created_hashmap_of_slips_spent_this_block = false;
+                block.safe_to_prune_transactions = false;
+                block.slips_spent_this_block.clear();
+
+                let block_id = block.id;
+                let block_hash = block.hash;
+
+                tester
+                    .consensus_thread
+                    .process_event(ConsensusEvent::BlockFetched {
+                        block: block,
+                        peer_index: 0,
+                    })
+                    .await;
+                tester
+                    .wait_till_block_id_with_hash(block_id, block_hash)
+                    .await
+                    .unwrap();
+                if block_id == 40 {
+                    break;
+                }
+            }
+        }
+
+        let latest_block_id_new = tester
+            .consensus_thread
+            .blockchain_lock
+            .read()
+            .await
+            .get_latest_block_id();
+        assert_eq!(latest_block_id_new, 20);
         tester
             .check_total_supply()
             .await
