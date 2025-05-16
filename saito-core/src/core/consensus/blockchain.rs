@@ -155,7 +155,7 @@ impl Blockchain {
     ) -> AddBlockResult {
         if block.generate().is_err() {
             error!(
-                "block generation failed. not adding block : {:?}",
+                "block metadata generation failed. not adding block : {:?}",
                 block.hash.to_hex()
             );
             return AddBlockResult::FailedNotValid;
@@ -372,11 +372,13 @@ impl Blockchain {
                         }
                     }
 
-                    new_chain.clear();
-                    new_chain.push(block_hash);
+                    // new_chain.clear();
+                    // new_chain.push(block_hash);
                     am_i_the_longest_chain = false;
                 }
             }
+            old_chain =
+                self.calculate_old_chain_upto_length(latest_block_hash, new_chain.len() as BlockId);
         }
 
         // at this point we should have a shared ancestor or not
@@ -483,6 +485,33 @@ impl Blockchain {
         let mut old_chain_hash = latest_block_hash;
 
         while shared_block_hash != old_chain_hash {
+            if self.blocks.contains_key(&old_chain_hash) {
+                old_chain.push(old_chain_hash);
+                old_chain_hash = self
+                    .blocks
+                    .get(&old_chain_hash)
+                    .unwrap()
+                    .previous_block_hash;
+                if old_chain_hash == [0; 32] {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        old_chain
+    }
+
+    fn calculate_old_chain_upto_length(
+        &mut self,
+        latest_block_hash: SaitoHash,
+        length: BlockId,
+    ) -> Vec<SaitoHash> {
+        let mut old_chain: Vec<[u8; 32]> = Vec::new();
+        let mut old_chain_hash = latest_block_hash;
+
+        while old_chain.len() <= length as usize {
             if self.blocks.contains_key(&old_chain_hash) {
                 old_chain.push(old_chain_hash);
                 old_chain_hash = self
