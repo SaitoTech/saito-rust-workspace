@@ -553,10 +553,17 @@ export default class Saito {
         return new BalanceSnapshot(snapshot);
     }
 
+
     public async getNftList(): Promise<string> {
-        const nftList = (await Saito.getLibInstance().get_nft_list()).map((nft: any) => new Nft(nft));
-        return JSON.stringify(nftList.map((nft: any) => nft.toJSON()));
+        const raw = await Saito.getLibInstance().get_nft_list();
+
+        const arr = Array.from(raw) as any[];
+
+        const json = JSON.stringify(arr.map(w => new Nft(w).toJSON()));
+
+        return json;
     }
+
 
     public async updateBalanceFrom(snapshot: BalanceSnapshot) {
         await Saito.getLibInstance().update_from_balance_snapshot(snapshot.instance);

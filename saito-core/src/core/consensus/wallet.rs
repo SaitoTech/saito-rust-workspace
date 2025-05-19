@@ -68,6 +68,27 @@ impl Default for NFT {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct DetailedNFT {
+    pub slip1: Slip,
+    pub slip2: Slip,
+    pub slip3: Slip,
+    pub id: Vec<u8>,
+    pub tx_sig: SaitoSignature,
+}
+
+impl Default for DetailedNFT {
+    fn default() -> Self {
+        DetailedNFT {
+            slip1: Slip::default(),
+            slip2: Slip::default(),
+            slip3: Slip::default(),
+            id: Vec::new(),
+            tx_sig: [0u8; 64],
+        }
+    }
+}
+
 /// The `Wallet` manages the public and private keypair of the node and holds the
 /// slips that are used to form transactions on the network.
 #[derive(Clone, Debug, PartialEq)]
@@ -123,9 +144,7 @@ impl Wallet {
         }
     }
     pub async fn save(wallet: &mut Wallet, io: &(dyn InterfaceIO + Send + Sync)) {
-        trace!("saving wallet");
         io.save_wallet(wallet).await.unwrap();
-        trace!("wallet saved");
     }
 
     pub async fn reset(
@@ -1292,8 +1311,29 @@ impl Wallet {
         Ok((selected_staking_inputs, outputs))
     }
 
-    pub fn get_nft_list(&self) -> &[NFT] {
-        &self.nfts
+    pub fn get_nft_list(&self) -> Vec<DetailedNFT> {
+        self.nfts
+            .iter()
+            .map(|nft| {
+                //
+                // parse each utxokey back into a Slip
+                //
+                let s1 = Slip::parse_slip_from_utxokey(&nft.slip1)
+                    .expect("bound utxokey must parse to Slip");
+                let s2 = Slip::parse_slip_from_utxokey(&nft.slip2)
+                    .expect("normal utxokey must parse to Slip");
+                let s3 = Slip::parse_slip_from_utxokey(&nft.slip3)
+                    .expect("bound utxokey must parse to Slip");
+
+                DetailedNFT {
+                    id: nft.id.clone(),
+                    tx_sig: nft.tx_sig,
+                    slip1: s1,
+                    slip2: s2,
+                    slip3: s3,
+                }
+            })
+            .collect()
     }
 }
 

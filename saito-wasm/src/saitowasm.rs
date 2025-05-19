@@ -23,8 +23,9 @@ use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::consensus::context::Context;
 use saito_core::core::consensus::mempool::Mempool;
 use saito_core::core::consensus::peers::peer_collection::PeerCollection;
+use saito_core::core::consensus::slip::Slip;
 use saito_core::core::consensus::transaction::{Transaction, TransactionType};
-use saito_core::core::consensus::wallet::{Wallet, NFT};
+use saito_core::core::consensus::wallet::{DetailedNFT, Wallet, NFT};
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
     BlockId, Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
@@ -650,12 +651,36 @@ pub async fn get_nft_list() -> Result<Array, JsValue> {
     let saito = SAITO.lock().await;
     let wallet = saito.as_ref().unwrap().context.wallet_lock.read().await;
 
-    let nft_array = Array::new();
-    for nft in wallet.get_nft_list().iter() {
-        nft_array.push(&WasmNFT::from_nft(nft.clone()).into());
+    let detailed_nfts: Vec<DetailedNFT> = wallet.get_nft_list();
+
+    let js_array = Array::new_with_length(detailed_nfts.len() as u32);
+
+    //
+    // for each DetailedNFT, build a WasmNFT
+    //
+    for (id, nft) in detailed_nfts.into_iter().enumerate() {
+        let mut w = WasmNFT::new();
+
+        let id_arr = Uint8Array::from(nft.id.as_slice());
+        w.set_id(&id_arr);
+
+        let sig_arr = Uint8Array::from(nft.tx_sig.as_ref());
+        w.set_tx_sig(&sig_arr);
+
+        //
+        // Slip to WasmSlip
+        //
+        let ws1 = WasmSlip::new_from_slip(nft.slip1);
+        w.set_slip1(&ws1);
+        let ws2 = WasmSlip::new_from_slip(nft.slip2);
+        w.set_slip2(&ws2);
+        let ws3 = WasmSlip::new_from_slip(nft.slip3);
+        w.set_slip3(&ws3);
+
+        js_array.set(id as u32, w.into());
     }
 
-    Ok(nft_array)
+    Ok(js_array)
 }
 
 #[wasm_bindgen]
