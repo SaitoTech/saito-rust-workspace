@@ -29,7 +29,7 @@ use saito_core::core::consensus::wallet::{DetailedNFT, Wallet, NFT};
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
     BlockId, Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
-    Timestamp, CHANNEL_SAFE_BUFFER, STAT_BIN_COUNT,
+    Timestamp, CHANNEL_SAFE_BUFFER, STAT_BIN_COUNT, SaitoUTXOSetKey
 };
 use saito_core::core::io::network::{Network, PeerDisconnectType};
 use saito_core::core::io::network_event::NetworkEvent;
@@ -609,42 +609,44 @@ pub async fn create_bound_transaction(
 #[wasm_bindgen]
 pub async fn create_send_bound_transaction(
     amt: u64,
-    nft_id: String,
+    slip1_utxo_key: JsString,
+    slip2_utxo_key: JsString,
+    slip3_utxo_key: JsString,
     data: String,
     recipient_public_key: JsString,
 ) -> Result<WasmTransaction, JsValue> {
     let saito = SAITO.lock().await;
     let mut wallet = saito.as_ref().unwrap().context.wallet_lock.write().await;
 
-    // Decode the NFT id hex string into a Vec<u8>
-    let nft_id_vec = hex::decode(&nft_id)
-        .map_err(|_| JsValue::from_str("Failed to decode nft_id hex string"))?;
+    let s1: SaitoUTXOSetKey = string_to_hex(slip1_utxo_key)
+        .map_err(|_| JsValue::from_str("Invalid slip1_utxo_key"))?;
+    let s2: SaitoUTXOSetKey = string_to_hex(slip2_utxo_key)
+        .map_err(|_| JsValue::from_str("Invalid slip2_utxo_key"))?;
+    let s3: SaitoUTXOSetKey = string_to_hex(slip3_utxo_key)
+        .map_err(|_| JsValue::from_str("Invalid slip3_utxo_key"))?;
 
-    let serialized_data =
+    let serialized_data: Vec<u8> =
         serde_json::to_vec(&data).map_err(|_| JsValue::from_str("Failed to serialize data"))?;
     let serialized_data_u32: Vec<u32> = serialized_data
         .chunks(4)
         .map(|chunk| {
-            let mut bytes = [0u8; 4];
-            for (i, &b) in chunk.iter().enumerate() {
-                bytes[i] = b;
-            }
-            u32::from_le_bytes(bytes)
+            let mut b = [0u8; 4];
+            b[..chunk.len()].copy_from_slice(chunk);
+            u32::from_le_bytes(b)
         })
         .collect();
 
-    let key = string_to_key(recipient_public_key).or(Err(JsValue::from_str(
-        "Failed parsing public key string to key",
-    )))?;
+    let key = string_to_key(recipient_public_key)
+        .map_err(|_| JsValue::from_str("Bad recipient_public_key"))?;
 
     let tx = wallet
-        .create_send_bound_transaction(amt, nft_id_vec, serialized_data_u32, &key)
+        .create_send_bound_transaction(amt, s1, s2, s3, serialized_data_u32, &key)
         .await
-        .map_err(|_| JsValue::from_str("Failed to transfer NFT transaction"))?;
+        .map_err(|_| JsValue::from_str("create_send_bound_transaction failed"))?;
 
-    let wasm_transaction = WasmTransaction::from_transaction(tx);
-    Ok(wasm_transaction)
+    Ok(WasmTransaction::from_transaction(tx))
 }
+
 
 #[wasm_bindgen]
 pub async fn get_nft_list() -> Result<Array, JsValue> {

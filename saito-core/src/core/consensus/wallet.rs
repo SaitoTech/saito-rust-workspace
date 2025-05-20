@@ -793,7 +793,7 @@ impl Wallet {
         //
         let output_slip1 = Slip {
             public_key: self.public_key,
-            amount: 1, // temporary
+            amount: nft_create_deposit_amt,
             slip_type: SlipType::Bound,
             ..Default::default()
         };
@@ -927,13 +927,15 @@ impl Wallet {
         Ok(transaction)
     }
 
-    pub async fn create_send_bound_transaction(
-        &mut self,
-        nft_amount: Currency,
-        nft_id: Vec<u8>,
-        nft_data: Vec<u32>,
-        recipient_public_key: &SaitoPublicKey,
-    ) -> Result<Transaction, Error> {
+        pub async fn create_send_bound_transaction(
+            &mut self,
+            nft_amount: Currency,
+            slip1_utxokey: SaitoUTXOSetKey,
+            slip2_utxokey: SaitoUTXOSetKey,
+            slip3_utxokey: SaitoUTXOSetKey,
+            nft_data: Vec<u32>,
+            recipient_public_key: &SaitoPublicKey,
+        ) -> Result<Transaction, Error> {
         //
         // create our Bound-type transaction for this transfer
         //
@@ -943,11 +945,13 @@ impl Wallet {
         //
         // locate NFT from our repository of NFT slips
         //
-        let pos = self
-            .nfts
-            .iter()
-            .position(|nft| nft.id == nft_id)
-            .ok_or(Error::new(ErrorKind::NotFound, "NFT not found"))?;
+        let pos = self.nfts.iter()
+            .position(|nft|
+                nft.slip1 == slip1_utxokey &&
+                nft.slip2 == slip2_utxokey &&
+                nft.slip3 == slip3_utxokey
+            )
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, "NFT not found"))?;
         let old_nft = self.nfts.remove(pos);
 
         //
@@ -962,9 +966,9 @@ impl Wallet {
         // for an NFT transfer to be considered valid by network rules. lucky
         // for us, our NFT repository stores this information.
         //
-        let input_slip1 = Slip::parse_slip_from_utxokey(&old_nft.slip1)?;
-        let input_slip2 = Slip::parse_slip_from_utxokey(&old_nft.slip2)?;
-        let input_slip3 = Slip::parse_slip_from_utxokey(&old_nft.slip3)?;
+        let input_slip1 = Slip::parse_slip_from_utxokey(&slip1_utxokey)?;
+        let input_slip2 = Slip::parse_slip_from_utxokey(&slip2_utxokey)?;
+        let input_slip3 = Slip::parse_slip_from_utxokey(&slip3_utxokey)?;
 
         //
         // generate the 3 output slips
