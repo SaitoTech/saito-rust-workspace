@@ -68,6 +68,27 @@ impl Default for NFT {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct DetailedNFT {
+    pub slip1: Slip,
+    pub slip2: Slip,
+    pub slip3: Slip,
+    pub id: Vec<u8>,
+    pub tx_sig: SaitoSignature,
+}
+
+impl Default for DetailedNFT {
+    fn default() -> Self {
+        DetailedNFT {
+            slip1: Slip::default(),
+            slip2: Slip::default(),
+            slip3: Slip::default(),
+            id: Vec::new(),
+            tx_sig: [0u8; 64],
+        }
+    }
+}
+
 /// The `Wallet` manages the public and private keypair of the node and holds the
 /// slips that are used to form transactions on the network.
 #[derive(Clone, Debug, PartialEq)]
@@ -123,9 +144,7 @@ impl Wallet {
         }
     }
     pub async fn save(wallet: &mut Wallet, io: &(dyn InterfaceIO + Send + Sync)) {
-        trace!("saving wallet");
         io.save_wallet(wallet).await.unwrap();
-        trace!("wallet saved");
     }
 
     pub async fn reset(
@@ -774,7 +793,7 @@ impl Wallet {
         //
         let output_slip1 = Slip {
             public_key: self.public_key,
-            amount: 1, // temporary
+            amount: nft_create_deposit_amt,
             slip_type: SlipType::Bound,
             ..Default::default()
         };
@@ -908,13 +927,15 @@ impl Wallet {
         Ok(transaction)
     }
 
-    pub async fn create_send_bound_transaction(
-        &mut self,
-        nft_amount: Currency,
-        nft_id: Vec<u8>,
-        nft_data: Vec<u32>,
-        recipient_public_key: &SaitoPublicKey,
-    ) -> Result<Transaction, Error> {
+        pub async fn create_send_bound_transaction(
+            &mut self,
+            nft_amount: Currency,
+            slip1_utxokey: SaitoUTXOSetKey,
+            slip2_utxokey: SaitoUTXOSetKey,
+            slip3_utxokey: SaitoUTXOSetKey,
+            nft_data: Vec<u32>,
+            recipient_public_key: &SaitoPublicKey,
+        ) -> Result<Transaction, Error> {
         //
         // create our Bound-type transaction for this transfer
         //
@@ -924,11 +945,13 @@ impl Wallet {
         //
         // locate NFT from our repository of NFT slips
         //
-        let pos = self
-            .nfts
-            .iter()
-            .position(|nft| nft.id == nft_id)
-            .ok_or(Error::new(ErrorKind::NotFound, "NFT not found"))?;
+        let pos = self.nfts.iter()
+            .position(|nft|
+                nft.slip1 == slip1_utxokey &&
+                nft.slip2 == slip2_utxokey &&
+                nft.slip3 == slip3_utxokey
+            )
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, "NFT not found"))?;
         let old_nft = self.nfts.remove(pos);
 
         //
@@ -943,9 +966,9 @@ impl Wallet {
         // for an NFT transfer to be considered valid by network rules. lucky
         // for us, our NFT repository stores this information.
         //
-        let input_slip1 = Slip::parse_slip_from_utxokey(&old_nft.slip1)?;
-        let input_slip2 = Slip::parse_slip_from_utxokey(&old_nft.slip2)?;
-        let input_slip3 = Slip::parse_slip_from_utxokey(&old_nft.slip3)?;
+        let input_slip1 = Slip::parse_slip_from_utxokey(&slip1_utxokey)?;
+        let input_slip2 = Slip::parse_slip_from_utxokey(&slip2_utxokey)?;
+        let input_slip3 = Slip::parse_slip_from_utxokey(&slip3_utxokey)?;
 
         //
         // generate the 3 output slips
@@ -1292,8 +1315,29 @@ impl Wallet {
         Ok((selected_staking_inputs, outputs))
     }
 
-    pub fn get_nft_list(&self) -> &[NFT] {
-        &self.nfts
+    pub fn get_nft_list(&self) -> Vec<DetailedNFT> {
+        self.nfts
+            .iter()
+            .map(|nft| {
+                //
+                // parse each utxokey back into a Slip
+                //
+                let s1 = Slip::parse_slip_from_utxokey(&nft.slip1)
+                    .expect("bound utxokey must parse to Slip");
+                let s2 = Slip::parse_slip_from_utxokey(&nft.slip2)
+                    .expect("normal utxokey must parse to Slip");
+                let s3 = Slip::parse_slip_from_utxokey(&nft.slip3)
+                    .expect("bound utxokey must parse to Slip");
+
+                DetailedNFT {
+                    id: nft.id.clone(),
+                    tx_sig: nft.tx_sig,
+                    slip1: s1,
+                    slip2: s2,
+                    slip3: s3,
+                }
+            })
+            .collect()
     }
 }
 
